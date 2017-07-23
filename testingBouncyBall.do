@@ -11,4 +11,4 @@ force {CLOCK_50} 0 0ns, 1 5 ns -r 10 ns
 run 10 ns
 force {SW} 2#00000001
 force {CLOCK_50} 0 0ns, 1 5 ns -r 10 ns
-run 600 ns
+run 700 ns

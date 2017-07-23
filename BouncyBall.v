@@ -193,9 +193,9 @@ module control(
             next_state <= S_START_DRAW_BALL;
         else if (current_state == S_START_DRAW_BALL)
             next_state <= S_DRAW_BALL;		
-        else if(current_state == S_DRAW_BALL && counter_1 <= NUM_OF_BALL_PIXELS)
+        else if(current_state == S_DRAW_BALL && counter_1 < NUM_OF_BALL_PIXELS)
             next_state <= S_DRAW_BALL;		
-        else if(current_state == S_DRAW_BALL && counter_1 > NUM_OF_BALL_PIXELS)
+        else if(current_state == S_DRAW_BALL && counter_1 >= NUM_OF_BALL_PIXELS)
             next_state <= S_START_DRAW_PADDLE;
         else if (current_state == S_START_DRAW_PADDLE)
             next_state <= S_DRAW_PADDLE_ROW;		
@@ -418,7 +418,7 @@ module datapath(
         else if (draw_paddle) begin
             writeEn <= 1'b1; 
             draw_x <= paddle_x + counter_1;
-			draw_y <= SCREEN_HEIGHT - counter_2;
+			draw_y <= SCREEN_HEIGHT - counter_2 - 1;
 			colour <= 3'b011;	
         end
     end
