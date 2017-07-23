@@ -73,6 +73,7 @@ module BouncyBall
     // lots of wires to connect our datapath and control
     wire move_objects, bounce_ball, reset_ball, left_key, right_key; 
 	wire [7:0] ball_x, ball_y, paddle_x;
+	wire [9:0] counter_1, counter_2;
 	
 	// Controller keys
 	assign left_key = KEY[3];
@@ -87,6 +88,10 @@ module BouncyBall
         .move_objects(move_objects), 
         .bounce_ball(bounce_ball),
         .reset_ball(reset_ball),
+		.reset_paddle(reset_paddle),
+		
+        .counter_1(counter_1),
+        .counter_2(counter_2),
 
         .left_key(left_key),
         .right_key(right_key),
@@ -94,6 +99,7 @@ module BouncyBall
 		.ball_x(ball_x),
 		.ball_y(ball_y),
 		.paddle_x(paddle_x),
+		.ball_direction(ball_direction),
 		
 		.writeEn(writeEn),
         .draw_x(x),
@@ -116,6 +122,9 @@ module BouncyBall
         .move_objects(move_objects), 
         .bounce_ball(bounce_ball),
         .reset_ball(reset_ball),
+		
+        .counter_1(counter_1),
+        .counter_2(counter_2)
     );
 
     
@@ -129,7 +138,7 @@ module control(
 	
 	input [7:0] ball_x, ball_y, paddle_x,
 
-    output reg draw_screen, move_objects, bounce_ball, reset_ball,
+    output reg draw_screen, move_objects, bounce_ball, reset_ball, reset_paddle,
 	output reg [9:0] counter_1, counter_2
     );
 
@@ -181,6 +190,7 @@ module control(
         move_objects = 1'b0;
 		bounce_ball = 1'b0;
 		reset_ball = 1'b0;
+		reset_paddle = 1'b0;
 		reset_counter_1 = 1'b0;
 		reset_counter_2 = 1'b0;
 		incCounter_1 = 1'b0;
@@ -188,6 +198,10 @@ module control(
 
         case (current_state)
             S_INITIALIZE: begin
+				reset_ball = 1'b1; 
+				reset_paddle = 1'b1;
+				reset_counter_1 = 1'b1;
+				reset_counter_2 = 1'b1;
                 end
             S_START_DRAW: begin
 				reset_counter_1 = 1'b1;
@@ -241,11 +255,13 @@ endmodule
 module datapath(
     input clk,
     input resetn,
-    input draw_screen, move_objects, bounce_ball, reset_ball,
+    input draw_screen, move_objects, bounce_ball, reset_ball, reset_paddle,
+	input [9:0] counter_1, counter_2,
 
     input left_key, right_key,
 	
 	output reg [7:0] ball_x, ball_y, paddle_x,
+	output reg [1:0] ball_direction,			// 0 = 45°, 1 = 135°, 2 = 225°, 3 = 315°
     output reg writeEn, draw_x, draw_y,
 	output reg [2:0] colour
     );
@@ -255,6 +271,7 @@ module datapath(
         if (resetn || reset_ball) begin
             ball_x <= 8'd0; 
             ball_y <= 8'd0;
+			ball_direction <= 8'd0;
         end
         else if (move_objects
             if (ld_values)
@@ -275,7 +292,7 @@ module datapath(
 	
     // Paddle movement logic
     always @ (posedge clk) begin
-        if (resetn) begin
+        if (resetn || reset_paddle) begin
             paddle_x <= 8'd0; 
         end
         else if (move_objects
