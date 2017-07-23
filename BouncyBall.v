@@ -71,10 +71,11 @@ module BouncyBall
 	// for the VGA controller, in addition to any other functionality your design may require.
     
     // lots of wires to connect our datapath and control
-    wire draw_background, draw_ball, draw_paddle, move_objects, bounce_ball, reset_ball, reset_paddle, left_key, right_key, go_key; 
+    wire draw_background, draw_ball, draw_paddle, check_ball_touching, move_objects, bounce_ball, reset_ball, reset_paddle, left_key, right_key, go_key; 
+	wire ball_touching_wall;
 	wire [7:0] ball_x, paddle_x;
 	wire [6:0] ball_y;
-	wire [9:0] counter_1, counter_2;
+	wire [24:0] counter_1, counter_2;
 	
 	// Controller keys
 	assign left_key = KEY[3];
@@ -89,6 +90,7 @@ module BouncyBall
         .draw_background(draw_background), 
         .draw_ball(draw_ball), 
         .draw_paddle(draw_paddle), 
+		.check_ball_touching(check_ball_touching),
         .move_objects(move_objects), 
         .bounce_ball(bounce_ball),
         .reset_ball(reset_ball),
@@ -103,6 +105,7 @@ module BouncyBall
 		.ball_x(ball_x),
 		.ball_y(ball_y),
 		.paddle_x(paddle_x),
+		.ball_touching_wall(ball_touching_wall),
 		
 		.writeEn(writeEn),
         .draw_x(x),
@@ -120,10 +123,12 @@ module BouncyBall
 		.ball_x(ball_x),
 		.ball_y(ball_y),
 		.paddle_x(paddle_x),
+		.ball_touching_wall(ball_touching_wall),
 		
         .draw_background(draw_background), 
         .draw_ball(draw_ball), 
         .draw_paddle(draw_paddle), 
+		.check_ball_touching(check_ball_touching),
         .move_objects(move_objects), 
         .bounce_ball(bounce_ball),
         .reset_ball(reset_ball),
@@ -145,22 +150,25 @@ module control(
 	input [7:0] ball_x, 
 	input [6:0] ball_y,
 	input [7:0] paddle_x,
+	input ball_touching_wall,
 
-    output reg draw_background, draw_ball, draw_paddle, move_objects, bounce_ball, reset_ball, reset_paddle,
-	output reg [14:0] counter_1, counter_2
+    output reg draw_background, draw_ball, draw_paddle, check_ball_touching, move_objects, bounce_ball, reset_ball, reset_paddle,
+	output reg [24:0] counter_1, counter_2
     );
 
     reg [4:0] current_state, next_state;
 	reg incCounter_1, incCounter_2, reset_counter_1, reset_counter_2;
 	
-	localparam	SCREEN_WIDTH			= 8'd8,
-				SCREEN_HEIGHT			= 7'd4,
-				// SCREEN_WIDTH			= 8'd160,
-				// SCREEN_HEIGHT		= 8'd120,
+	localparam	//SCREEN_WIDTH			= 8'd8,				// For ModelSim Testing purposes
+				//SCREEN_HEIGHT			= 7'd4,
+				SCREEN_WIDTH			= 8'd160,
+				SCREEN_HEIGHT			= 8'd120,
 				NUM_OF_BALL_PIXELS		= 4'd12,
-				PADDLE_WIDTH			= 5'd4,
-				//PADDLE_WIDTH			= 5'd18,
+				//PADDLE_WIDTH			= 5'd4,		// For ModelSim Testing purposes
+				PADDLE_WIDTH			= 5'd18,
 				PADDLE_HEIGHT			= 2'd2;
+				//WAIT_CYCLES				= 5'b5;		// For ModelSim Testing purposes
+				WAIT_CYCLES				= 24'b12500000;		// ~4 cycles per second
     
     localparam  S_INITIALIZE  					= 4'd0,
 				S_START_DRAW_BACKGROUND			= 4'd1,
@@ -171,12 +179,14 @@ module control(
 				S_START_DRAW_PADDLE				= 4'd6,
 				S_DRAW_PADDLE_ROW				= 4'd7,
 				S_DRAW_PADDLE_NEXT_ROW			= 4'd8,
-                S_WAIT   						= 4'd9,
-                S_MOVE_BALL 					= 4'd10,
-                S_BOUNCE_BALL					= 4'd11,
-				S_MOVE_PADDLE					= 4'd12;
+                S_START_WAIT   					= 4'd9,
+                S_WAIT   						= 4'd10,
+				S_CHECK_BALL_TOUCHING			= 4'd11,
+                S_BOUNCE_BALL					= 4'd12,
+				S_MOVE_OBJECTS					= 4'd13;
     
     // Next state logic aka our state table
+	// Current model: Intialize -> Draw Screen -> Wait -> Move Objects -> Draw Screen - > Wait -> etc.
     always@(*)
     begin: state_FFs 
         if (current_state == S_INITIALIZE)
@@ -206,13 +216,21 @@ module control(
         else if(current_state == S_DRAW_PADDLE_NEXT_ROW && counter_2 < PADDLE_HEIGHT - 1)
             next_state <= S_DRAW_PADDLE_ROW;
         else if(current_state == S_DRAW_PADDLE_NEXT_ROW && counter_2 >= PADDLE_HEIGHT - 1)
+            next_state <= S_START_WAIT;
+        else if (current_state == S_START_WAIT)
             next_state <= S_WAIT;
-        else if(current_state == S_WAIT)
-            next_state <= go ? S_WAIT : S_MOVE_BALL; // Loop in current state until go signal goes low
-        else if(current_state == S_MOVE_BALL)
+        else if(current_state == S_WAIT && counter_1 < WAIT_CYCLES - 1)
             next_state <= S_WAIT;
+        else if(current_state == S_WAIT && counter_1 >= WAIT_CYCLES - 1)
+            next_state <= S_CHECK_BALL_TOUCHING;
+        else if(current_state == S_CHECK_BALL_TOUCHING && ball_touching_wall)
+            next_state <= S_BOUNCE_BALL;
+        else if(current_state == S_CHECK_BALL_TOUCHING && !ball_touching_wall)
+            next_state <= S_MOVE_OBJECTS;
         else if(current_state == S_BOUNCE_BALL)
-            next_state <= S_MOVE_BALL;
+            next_state <= S_MOVE_OBJECTS;
+        else if(current_state == S_MOVE_OBJECTS)
+            next_state <= S_START_DRAW_BACKGROUND;
         else
             next_state <= S_INITIALIZE;
     end // state_FFs
@@ -225,6 +243,7 @@ module control(
 		draw_background = 1'b0;
 		draw_ball = 1'b0;
 		draw_paddle = 1'b0;
+		check_ball_touching = 1'b0;
         move_objects = 1'b0;
 		bounce_ball = 1'b0;
 		reset_ball = 1'b0;
@@ -272,6 +291,21 @@ module control(
 				incCounter_2 = 1'b1;
 				reset_counter_1 = 1'b1;
             end
+            S_START_WAIT: begin
+				reset_counter_1 = 1'b1;
+            end
+            S_WAIT: begin
+				incCounter_1 = 1'b1;
+            end
+			S_CHECK_BALL_TOUCHING: begin
+				check_ball_touching = 1'b1;
+			end
+			S_BOUNCE_BALL: begin
+				bounce_ball = 1'b1;
+			end	
+			S_MOVE_OBJECTS: begin
+				move_objects = 1'b1;
+			end				
         // default:    // don't need default since we already made sure all of our outputs were assigned a value at the start of the always block
         endcase
     end // enable_signals
@@ -289,7 +323,7 @@ module control(
     always@(posedge clk)
     begin: counter_1_FFs
         if(!resetn || reset_counter_1)
-            counter_1 <= 9'b0;
+            counter_1 <= 24'b0;
         else if(incCounter_1)
             counter_1 <= counter_1 + 1'b1;
     end
@@ -298,7 +332,7 @@ module control(
     always@(posedge clk)
     begin: counter_2_FFs
         if(!resetn || reset_counter_2)
-            counter_2 <= 9'b0;
+            counter_2 <= 24'b0;
         else if(incCounter_2)
             counter_2 <= counter_2 + 1'b1;
     end
@@ -307,14 +341,15 @@ endmodule
 module datapath(
     input clk,
     input resetn,
-    input draw_background, draw_ball, draw_paddle, move_objects, bounce_ball, reset_ball, reset_paddle,
-	input [9:0] counter_1, counter_2,
+    input draw_background, draw_ball, draw_paddle, check_ball_touching, move_objects, bounce_ball, reset_ball, reset_paddle,
+	input [24:0] counter_1, counter_2,
 
     input left_key, right_key,
 	
 	output reg [7:0] ball_x, 
 	output reg [6:0] ball_y, 
 	output reg [7:0] paddle_x,
+	output reg ball_touching_wall,
     output reg writeEn,
 	output reg [7:0] draw_x,
 	output reg [6:0] draw_y,
@@ -323,16 +358,16 @@ module datapath(
 	
 	reg [1:0] ball_direction;			// 0 = 45°, 1 = 135°, 2 = 225°, 3 = 315°
 	
-	localparam	SCREEN_WIDTH			= 8'd8,
-				SCREEN_HEIGHT			= 7'd4,
-				// SCREEN_WIDTH			= 8'd160,
-				// SCREEN_HEIGHT		= 8'd120,
-				BALL_START_X			= 8'd0,
-				BALL_START_Y			= 8'd0,
-				PADDLE_START_X			= 8'd0;
-				// BALL_START_X			= 8'd78,
-				// BALL_START_Y			= 8'd58,
-				// PADDLE_START_X		= 8'd78;
+	localparam	// SCREEN_WIDTH			= 8'd8,			// For ModelSim Testing purposes
+				// SCREEN_HEIGHT			= 7'd4,
+				SCREEN_WIDTH			= 8'd160,
+				SCREEN_HEIGHT			= 8'd120,
+				// BALL_START_X			= 8'd0,		// For ModelSim Testing purposes
+				// BALL_START_Y			= 8'd0,
+				// PADDLE_START_X			= 8'd0;
+				BALL_START_X			= 8'd78,
+				BALL_START_Y			= 8'd58,
+				PADDLE_START_X		= 8'd78;
 				
 	// Ball drawing parameters
 	localparam  draw1_0 = 4'd0,
@@ -430,8 +465,11 @@ module datapath(
             ball_y <= 7'd0;
 			ball_direction <= 2'd0;
         end
+        else if (bounce_ball) begin
+			ball_direction <= ball_direction + 1'b1;
+        end
         else if (move_objects) begin
-		
+			// Logic for moving the ball based on ball_direction
         end
     end
 	
@@ -441,8 +479,16 @@ module datapath(
             paddle_x <= 8'd0; 
         end
         else if (move_objects) begin
-		
+			// Logic for moving the ball based on left_key and right_key		
         end
+    end
+	
+    // Determining if the ball is touching the wall or paddle logic
+    always @ (posedge clk) begin
+		ball_touching_wall <= 1'b0
+        //if (check_ball_touching && ) begin 		<- Logic for determining if the ball is touching the paddle
+        //    ball_touching_wall <= 1'b1; 
+       // end
     end
     
 endmodule
