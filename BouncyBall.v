@@ -33,7 +33,7 @@ module BouncyBall
 	output	[9:0]	VGA_B;   				//	VGA Blue[9:0]
 	
 	wire resetn;
-	assign resetn = KEY[0];
+	assign resetn = SW[0];
 	
 	// Create the colour, x, y and writeEn wires that are inputs to the controller.
 	wire [2:0] colour;
@@ -44,35 +44,36 @@ module BouncyBall
 	// Create an Instance of a VGA controller - there can be only one!
 	// Define the number of colours as well as the initial background
 	// image file (.MIF) for the controller.
-	vga_adapter VGA(
-		.resetn(resetn),
-		.clock(CLOCK_50),
-		.colour(colour),
-		.x(x),
-		.y(y),
-		.plot(writeEn),
-		/* Signals for the DAC to drive the monitor. */
-		.VGA_R(VGA_R),
-		.VGA_G(VGA_G),
-		.VGA_B(VGA_B),
-		.VGA_HS(VGA_HS),
-		.VGA_VS(VGA_VS),
-		.VGA_BLANK(VGA_BLANK_N),
-		.VGA_SYNC(VGA_SYNC_N),
-		.VGA_CLK(VGA_CLK)
-	);
+	// vga_adapter VGA(
+		// .resetn(resetn),
+		// .clock(CLOCK_50),
+		// .colour(colour),
+		// .x(x),
+		// .y(y),
+		// .plot(writeEn),
+		// /* Signals for the DAC to drive the monitor. */
+		// .VGA_R(VGA_R),
+		// .VGA_G(VGA_G),
+		// .VGA_B(VGA_B),
+		// .VGA_HS(VGA_HS),
+		// .VGA_VS(VGA_VS),
+		// .VGA_BLANK(VGA_BLANK_N),
+		// .VGA_SYNC(VGA_SYNC_N),
+		// .VGA_CLK(VGA_CLK)
+	// );
 	
-	defparam VGA.RESOLUTION = "160x120";
-	defparam VGA.MONOCHROME = "FALSE";
-	defparam VGA.BITS_PER_COLOUR_CHANNEL = 1;
-	defparam VGA.BACKGROUND_IMAGE = "black.mif";
+	// defparam VGA.RESOLUTION = "160x120";
+	// defparam VGA.MONOCHROME = "FALSE";
+	// defparam VGA.BITS_PER_COLOUR_CHANNEL = 1;
+	// defparam VGA.BACKGROUND_IMAGE = "black.mif";
 			
 	// Put your code here. Your code should produce signals x,y,colour and writeEn/plot
 	// for the VGA controller, in addition to any other functionality your design may require.
     
     // lots of wires to connect our datapath and control
     wire draw_background, draw_ball, draw_paddle, move_objects, bounce_ball, reset_ball, reset_paddle, left_key, right_key, go_key; 
-	wire [7:0] ball_x, ball_y, paddle_x;
+	wire [7:0] ball_x, paddle_x;
+	wire [6:0] ball_y;
 	wire [9:0] counter_1, counter_2;
 	
 	// Controller keys
@@ -141,7 +142,9 @@ module control(
     input resetn,
     input go,
 	
-	input [7:0] ball_x, ball_y, paddle_x,
+	input [7:0] ball_x, 
+	input [6:0] ball_y,
+	input [7:0] paddle_x,
 
     output reg draw_background, draw_ball, draw_paddle, move_objects, bounce_ball, reset_ball, reset_paddle,
 	output reg [14:0] counter_1, counter_2
@@ -150,10 +153,13 @@ module control(
     reg [4:0] current_state, next_state;
 	reg incCounter_1, incCounter_2, reset_counter_1, reset_counter_2;
 	
-	localparam	SCREEN_WIDTH			= 8'd160,
-				SCREEN_HEIGHT			= 8'd120,
+	localparam	SCREEN_WIDTH			= 8'd8,
+				SCREEN_HEIGHT			= 7'd4,
+				// SCREEN_WIDTH			= 8'd160,
+				// SCREEN_HEIGHT		= 8'd120,
 				NUM_OF_BALL_PIXELS		= 4'd12,
-				PADDLE_WIDTH			= 5'd18,
+				PADDLE_WIDTH			= 5'd4,
+				//PADDLE_WIDTH			= 5'd18,
 				PADDLE_HEIGHT			= 2'd2;
     
     localparam  S_INITIALIZE  					= 4'd0,
@@ -174,41 +180,41 @@ module control(
     always@(*)
     begin: state_FFs 
         if (current_state == S_INITIALIZE)
-            next_state = S_START_DRAW_BACKGROUND;
-        if (current_state == S_START_DRAW_BACKGROUND)
-            next_state = S_DRAW_BACKGROUND_ROW;			
-        else if(current_state == S_DRAW_BACKGROUND_ROW && counter_1 <= SCREEN_WIDTH)
-            next_state = S_DRAW_BACKGROUND_ROW;
-        else if(current_state == S_DRAW_BACKGROUND_ROW && counter_1 > SCREEN_WIDTH)
-            next_state = S_DRAW_BACKGROUND_NEXT_ROW;
-        else if(current_state == S_DRAW_BACKGROUND_NEXT_ROW && counter_2 <= SCREEN_HEIGHT)
-            next_state = S_DRAW_BACKGROUND_ROW;
-        else if(current_state == S_DRAW_BACKGROUND_NEXT_ROW && counter_2 > SCREEN_HEIGHT)
-            next_state = S_START_DRAW_BALL;
+            next_state <= S_START_DRAW_BACKGROUND;
+        else if (current_state == S_START_DRAW_BACKGROUND)
+            next_state <= S_DRAW_BACKGROUND_ROW;			
+        else if(current_state == S_DRAW_BACKGROUND_ROW && counter_1 < SCREEN_WIDTH)
+            next_state <= S_DRAW_BACKGROUND_ROW;
+        else if(current_state == S_DRAW_BACKGROUND_ROW && counter_1 >= SCREEN_WIDTH)
+            next_state <= S_DRAW_BACKGROUND_NEXT_ROW;
+        else if(current_state == S_DRAW_BACKGROUND_NEXT_ROW && counter_2 < SCREEN_HEIGHT - 1)
+            next_state <= S_DRAW_BACKGROUND_ROW;
+        else if(current_state == S_DRAW_BACKGROUND_NEXT_ROW && counter_2 >= SCREEN_HEIGHT - 1)
+            next_state <= S_START_DRAW_BALL;
         else if (current_state == S_START_DRAW_BALL)
-            next_state = S_DRAW_BALL;		
+            next_state <= S_DRAW_BALL;		
         else if(current_state == S_DRAW_BALL && counter_1 <= NUM_OF_BALL_PIXELS)
-            next_state = S_DRAW_BALL;		
+            next_state <= S_DRAW_BALL;		
         else if(current_state == S_DRAW_BALL && counter_1 > NUM_OF_BALL_PIXELS)
-            next_state = S_START_DRAW_PADDLE;
+            next_state <= S_START_DRAW_PADDLE;
         else if (current_state == S_START_DRAW_PADDLE)
-            next_state = S_DRAW_PADDLE_ROW;		
-        else if(current_state == S_DRAW_PADDLE_ROW && counter_1 <= PADDLE_WIDTH)
-            next_state = S_DRAW_PADDLE_ROW;		
-        else if(current_state == S_DRAW_PADDLE_ROW && counter_1 > PADDLE_WIDTH)
-            next_state = S_DRAW_PADDLE_NEXT_ROW;
-        else if(current_state == S_DRAW_PADDLE_NEXT_ROW && counter_2 <= PADDLE_HEIGHT)
-            next_state = S_DRAW_PADDLE_ROW;
-        else if(current_state == S_DRAW_PADDLE_NEXT_ROW && counter_2 > PADDLE_HEIGHT)
-            next_state = S_WAIT;
+            next_state <= S_DRAW_PADDLE_ROW;		
+        else if(current_state == S_DRAW_PADDLE_ROW && counter_1 < PADDLE_WIDTH)
+            next_state <= S_DRAW_PADDLE_ROW;		
+        else if(current_state == S_DRAW_PADDLE_ROW && counter_1 >= PADDLE_WIDTH)
+            next_state <= S_DRAW_PADDLE_NEXT_ROW;
+        else if(current_state == S_DRAW_PADDLE_NEXT_ROW && counter_2 < PADDLE_HEIGHT - 1)
+            next_state <= S_DRAW_PADDLE_ROW;
+        else if(current_state == S_DRAW_PADDLE_NEXT_ROW && counter_2 >= PADDLE_HEIGHT - 1)
+            next_state <= S_WAIT;
         else if(current_state == S_WAIT)
-            next_state = go ? S_WAIT : S_MOVE_BALL; // Loop in current state until go signal goes low
+            next_state <= go ? S_WAIT : S_MOVE_BALL; // Loop in current state until go signal goes low
         else if(current_state == S_MOVE_BALL)
-            next_state = S_WAIT;
+            next_state <= S_WAIT;
         else if(current_state == S_BOUNCE_BALL)
-            next_state = S_MOVE_BALL;
+            next_state <= S_MOVE_BALL;
         else
-            next_state = S_INITIALIZE;
+            next_state <= S_INITIALIZE;
     end // state_FFs
    
 
@@ -234,38 +240,38 @@ module control(
 				reset_paddle = 1'b1;
 				reset_counter_1 = 1'b1;
 				reset_counter_2 = 1'b1;
-                end
+            end
             S_START_DRAW_BACKGROUND: begin
 				reset_counter_1 = 1'b1;
 				reset_counter_2 = 1'b1;
-                end
+            end
             S_DRAW_BACKGROUND_ROW: begin
 				draw_background = 1'b1;
 				incCounter_1 = 1'b1;
-                end
+            end
             S_DRAW_BACKGROUND_NEXT_ROW: begin
 				incCounter_2 = 1'b1;
 				reset_counter_1 = 1'b1;
-                end
+            end
             S_START_DRAW_BALL: begin
 				reset_counter_1 = 1'b1;
-                end
+            end
             S_DRAW_BALL: begin
 				draw_ball = 1'b1;
 				incCounter_1 = 1'b1;
-                end
+            end
             S_START_DRAW_PADDLE: begin
 				reset_counter_1 = 1'b1;
 				reset_counter_2 = 1'b1;
-                end
+            end
             S_DRAW_PADDLE_ROW: begin
 				draw_paddle = 1'b1;
 				incCounter_1 = 1'b1;
-                end
+            end
             S_DRAW_PADDLE_NEXT_ROW: begin
 				incCounter_2 = 1'b1;
 				reset_counter_1 = 1'b1;
-                end
+            end
         // default:    // don't need default since we already made sure all of our outputs were assigned a value at the start of the always block
         endcase
     end // enable_signals
@@ -273,7 +279,7 @@ module control(
     // current_state registers
     always@(posedge clk)
     begin: state_FFs2
-        if(resetn)
+        if(!resetn)
             current_state <= S_INITIALIZE;
         else
             current_state <= next_state;
@@ -282,7 +288,7 @@ module control(
     // handle counter 1
     always@(posedge clk)
     begin: counter_1_FFs
-        if(resetn || reset_counter_1)
+        if(!resetn || reset_counter_1)
             counter_1 <= 9'b0;
         else if(incCounter_1)
             counter_1 <= counter_1 + 1'b1;
@@ -291,9 +297,9 @@ module control(
     // handle counter 2
     always@(posedge clk)
     begin: counter_2_FFs
-        if(resetn || reset_counter_2)
+        if(!resetn || reset_counter_2)
             counter_2 <= 9'b0;
-        else if(incCounter_1)
+        else if(incCounter_2)
             counter_2 <= counter_2 + 1'b1;
     end
 endmodule
@@ -306,15 +312,27 @@ module datapath(
 
     input left_key, right_key,
 	
-	output reg [7:0] ball_x, ball_y, paddle_x,
-    output reg writeEn, draw_x, draw_y,
+	output reg [7:0] ball_x, 
+	output reg [6:0] ball_y, 
+	output reg [7:0] paddle_x,
+    output reg writeEn,
+	output reg [7:0] draw_x,
+	output reg [6:0] draw_y,
 	output reg [2:0] colour
     );
 	
 	reg [1:0] ball_direction;			// 0 = 45°, 1 = 135°, 2 = 225°, 3 = 315°
 	
-	localparam	SCREEN_WIDTH			= 8'd160,
-				SCREEN_HEIGHT			= 8'd120;
+	localparam	SCREEN_WIDTH			= 8'd8,
+				SCREEN_HEIGHT			= 7'd4,
+				// SCREEN_WIDTH			= 8'd160,
+				// SCREEN_HEIGHT		= 8'd120,
+				BALL_START_X			= 8'd0,
+				BALL_START_Y			= 8'd0,
+				PADDLE_START_X			= 8'd0;
+				// BALL_START_X			= 8'd78,
+				// BALL_START_Y			= 8'd58,
+				// PADDLE_START_X		= 8'd78;
 				
 	// Ball drawing parameters
 	localparam  draw1_0 = 4'd0,
@@ -332,6 +350,10 @@ module datapath(
 	
 	// Drawing Background logic
     always @ (posedge clk) begin
+		writeEn <= 0;
+		draw_x <= 0;
+		draw_y <= 0;
+		colour <= 0;
         if (draw_background) begin
             writeEn <= 1'b1; 
             draw_x <= counter_1;
@@ -403,10 +425,10 @@ module datapath(
     
     // Ball movement/bounce logic
     always @ (posedge clk) begin
-        if (resetn || reset_ball) begin
+        if (!resetn || reset_ball) begin
             ball_x <= 8'd0; 
-            ball_y <= 8'd0;
-			ball_direction <= 8'd0;
+            ball_y <= 7'd0;
+			ball_direction <= 2'd0;
         end
         else if (move_objects) begin
 		
@@ -415,7 +437,7 @@ module datapath(
 	
     // Paddle movement logic
     always @ (posedge clk) begin
-        if (resetn || reset_paddle) begin
+        if (!resetn || reset_paddle) begin
             paddle_x <= 8'd0; 
         end
         else if (move_objects) begin
