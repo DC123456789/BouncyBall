@@ -71,7 +71,7 @@ module BouncyBall
 	// for the VGA controller, in addition to any other functionality your design may require.
     
     // lots of wires to connect our datapath and control
-    wire move_objects, bounce_ball, reset_ball, left_key, right_key; 
+    wire draw_background, draw_ball, draw_paddle, move_objects, bounce_ball, reset_ball, left_key, right_key; 
 	wire [7:0] ball_x, ball_y, paddle_x;
 	wire [9:0] counter_1, counter_2;
 	
@@ -84,7 +84,9 @@ module BouncyBall
         .clk(clk),
         .resetn(resetn),
 
-        .draw_screen(draw_screen), 
+        .draw_background(draw_background), 
+        .draw_ball(draw_ball), 
+        .draw_paddle(draw_paddle), 
         .move_objects(move_objects), 
         .bounce_ball(bounce_ball),
         .reset_ball(reset_ball),
@@ -118,7 +120,9 @@ module BouncyBall
 		.ball_y(ball_y),
 		.paddle_x(paddle_x),
 		
-        .draw_screen(draw_screen), 
+        .draw_background(draw_background), 
+        .draw_ball(draw_ball), 
+        .draw_paddle(draw_paddle), 
         .move_objects(move_objects), 
         .bounce_ball(bounce_ball),
         .reset_ball(reset_ball),
@@ -138,38 +142,63 @@ module control(
 	
 	input [7:0] ball_x, ball_y, paddle_x,
 
-    output reg draw_screen, move_objects, bounce_ball, reset_ball, reset_paddle,
-	output reg [9:0] counter_1, counter_2
+    output reg draw_background, draw_ball, draw_paddle, move_objects, bounce_ball, reset_ball, reset_paddle,
+	output reg [14:0] counter_1, counter_2
     );
 
     reg [4:0] current_state, next_state;
 	reg incCounter_1, incCounter_2, reset_counter_1, reset_counter_2;
 	
 	localparam	SCREEN_WIDTH			= 8'd160,
-				SCREEN_HEIGHT			= 8'd120;
+				SCREEN_HEIGHT			= 8'd120,
+				NUM_OF_BALL_PIXELS		= 4'd12;
+				PADDLE_WIDTH			= 5'd18;
+				PADDLE_HEIGHT			= 2'd2;
     
-    localparam  S_INITIALIZE  			= 4'd0,
-				S_START_DRAW			= 4'd1,
-				S_DRAW_ROW      		= 4'd2,
-				S_DRAW_NEXT_ROW  		= 4'd3,
-                S_WAIT   				= 4'd4,
-                S_MOVE   				= 4'd5,
-                S_BOUNCE   				= 4'd6;
+    localparam  S_INITIALIZE  					= 4'd0,
+				S_START_DRAW_BACKGROUND			= 4'd1,
+				S_DRAW_BACKGROUND_ROW			= 4'd2,
+				S_DRAW_BACKGROUND_NEXT_ROW		= 4'd3,
+				S_START_DRAW_BALL				= 4'd4,
+				S_DRAW_BALL	  					= 4'd5,
+				S_START_DRAW_PADDLE				= 4'd6,
+				S_DRAW_PADDLE_ROW				= 4'd7,
+				S_DRAW_PADDLE_NEXT_ROW			= 4'd8,
+                S_WAIT   						= 4'd9,
+                S_MOVE_BALL 					= 4'd10,
+                S_BOUNCE_BALL					= 4'd11,
+				S_MOVE_PADDLE					= 4'd12;
     
     // Next state logic aka our state table
     always@(*)
     begin: state_FFs 
         if (current_state == S_INITIALIZE)
-            next_state = S_START_DRAW;
-        if (current_state == S_START_DRAW)
-            next_state = S_DRAW_ROW;			
-        else if(current_state == S_DRAW_ROW && counter_1 <= SCREEN_WIDTH)
-            next_state = S_DRAW_ROW;
-        else if(current_state == S_DRAW_ROW && counter_1 > SCREEN_WIDTH)
-            next_state = S_DRAW_NEXT_ROW;
-        else if(current_state == S_DRAW_NEXT_ROW && counter_2 <= SCREEN_HEIGHT)
-            next_state = S_DRAW_ROW;
-        else if(current_state == S_DRAW_NEXT_ROW && counter_2 > SCREEN_HEIGHT)
+            next_state = S_START_DRAW_BACKGROUND;
+        if (current_state == S_START_DRAW_BACKGROUND)
+            next_state = S_DRAW_BACKGROUND_ROW;			
+        else if(current_state == S_DRAW_BACKGROUND_ROW && counter_1 <= SCREEN_WIDTH)
+            next_state = S_DRAW_BACKGROUND_ROW;
+        else if(current_state == S_DRAW_BACKGROUND_ROW && counter_1 > SCREEN_WIDTH)
+            next_state = S_DRAW_BACKGROUND_NEXT_ROW;
+        else if(current_state == S_DRAW_BACKGROUND_NEXT_ROW && counter_2 <= SCREEN_HEIGHT)
+            next_state = S_DRAW_BACKGROUND_ROW;
+        else if(current_state == S_DRAW_BACKGROUND_NEXT_ROW && counter_2 > SCREEN_HEIGHT)
+            next_state = S_START_DRAW_BALL;
+        else if (current_state == S_START_DRAW_BALL)
+            next_state = S_DRAW_BALL;		
+        else if(current_state == S_DRAW_BALL && counter_1 <= NUM_OF_BALL_PIXELS)
+            next_state = S_DRAW_BALL;		
+        else if(current_state == S_DRAW_BALL && counter_1 > NUM_OF_BALL_PIXELS)
+            next_state = S_START_DRAW_PADDLE;
+        else if (current_state == S_START_DRAW_PADDLE)
+            next_state = S_DRAW_PADDLE_ROW;		
+        else if(current_state == S_DRAW_PADDLE_ROW && counter_1 <= PADDLE_WIDTH)
+            next_state = S_DRAW_PADDLE_ROW;		
+        else if(current_state == S_DRAW_PADDLE_ROW && counter_1 > PADDLE_WIDTH)
+            next_state = S_DRAW_PADDLE_NEXT_ROW;
+        else if(current_state == S_DRAW_PADDLE_NEXT_ROW && counter_2 <= PADDLE_HEIGHT)
+            next_state = S_DRAW_PADDLE_ROW;
+        else if(current_state == S_DRAW_PADDLE_NEXT_ROW && counter_2 > PADDLE_HEIGHT)
             next_state = S_WAIT;
         else if(current_state == S_WAIT)
             next_state = go ? S_WAIT : S_MOVE; // Loop in current state until go signal goes low
@@ -186,7 +215,9 @@ module control(
     always @(*)
     begin: enable_signals
         // By default make all our signals 0
-		draw_screen = 1'b0;
+		draw_background = 1'b0;
+		draw_ball = 1'b0;
+		draw_paddle = 1'b0;
         move_objects = 1'b0;
 		bounce_ball = 1'b0;
 		reset_ball = 1'b0;
@@ -203,16 +234,36 @@ module control(
 				reset_counter_1 = 1'b1;
 				reset_counter_2 = 1'b1;
                 end
-            S_START_DRAW: begin
+            S_START_DRAW_BACKGROUND: begin
 				reset_counter_1 = 1'b1;
 				reset_counter_2 = 1'b1;
                 end
-            S_DRAW_ROW: begin
-				draw_screen = 1'b1;
+            S_DRAW_BACKGROUND_ROW: begin
+				draw_background = 1'b1;
 				incCounter_1 = 1'b1;
                 end
-            S_DRAW_NEXT_ROW: begin
+            S_DRAW_BACKGROUND_NEXT_ROW: begin
 				incCounter_2 = 1'b1;
+				reset_counter_1 = 1'b1;
+                end
+            S_START_DRAW_BALL: begin
+				reset_counter_1 = 1'b1;
+                end
+            S_DRAW_BALL: begin
+				draw_ball = 1'b1;
+				incCounter_1 = 1'b1;
+                end
+            S_START_DRAW_PADDLE: begin
+				reset_counter_1 = 1'b1;
+				reset_counter_2 = 1'b1;
+                end
+            S_DRAW_PADDLE_ROW: begin
+				draw_paddle = 1'b1;
+				incCounter_1 = 1'b1;
+                end
+            S_DRAW_PADDLE_NEXT_ROW: begin
+				incCounter_2 = 1'b1;
+				reset_counter_1 = 1'b1;
                 end
             S_MOVE: begin
                 move_objects = 1'b1;
@@ -255,7 +306,7 @@ endmodule
 module datapath(
     input clk,
     input resetn,
-    input draw_screen, move_objects, bounce_ball, reset_ball, reset_paddle,
+    input draw_background, draw_ball, draw_paddle, move_objects, bounce_ball, reset_ball, reset_paddle,
 	input [9:0] counter_1, counter_2,
 
     input left_key, right_key,
@@ -265,6 +316,93 @@ module datapath(
     output reg writeEn, draw_x, draw_y,
 	output reg [2:0] colour
     );
+	
+	localparam	SCREEN_WIDTH			= 8'd160,
+				SCREEN_HEIGHT			= 8'd120;
+				
+	// Ball drawing parameters
+	localparam  draw1_0 = 4'd0,
+                draw2_0 = 4'd1,
+                draw0_1 = 4'd2,
+                draw1_1 = 4'd3,
+                draw2_1 = 4'd4,
+                draw3_1 = 4'd5,
+                draw0_2 = 4'd6,
+                draw1_2 = 4'd7,
+                draw2_2 = 4'd8,
+                draw3_2 = 4'd9,
+                draw1_3 = 4'd10,
+				draw2_3 = 4'd11;
+	
+	// Drawing Background logic
+    always @ (posedge clk) begin
+        if (draw_background) begin
+            writeEn <= 1'b1; 
+            draw_x <= counter_1;
+			draw_y <= counter_2;
+			colour <= 3'b000;
+        end
+        else if (draw_ball)
+			writeEn <= 1'b1;
+			begin: set_pixel_location
+				draw_x <= ball_x;
+				draw_y <= ball_y;
+				colour <= 3'b111;
+				case (counter_1)
+					draw1_0: begin
+						draw_x <= ball_x + 1'b1;
+					end
+					draw2_0: begin
+						draw_x <= ball_x + 2'b10;
+					end
+					draw0_1: begin
+						draw_y <= ball_y + 1'b1;
+					end
+					draw1_1: begin
+						draw_x <= ball_x + 1'b1;
+						draw_y <= ball_y + 1'b1;
+					end
+					draw2_1: begin
+						draw_x <= ball_x + 2'b10;
+						draw_y <= ball_y + 1'b1;
+					end
+					draw3_1: begin
+						draw_x <= ball_x + 2'b11;
+						draw_y <= ball_y + 1'b1;
+					end
+					draw0_2: begin
+						draw_x <= ball_x;
+						draw_y <= ball_y + 2'b10;
+					end
+					draw1_2: begin
+						draw_x <= ball_x + 1'b1;
+						draw_y <= ball_y + 2'b10;
+					end
+					draw2_2: begin
+						draw_x <= ball_x + 2'b10;
+						draw_y <= ball_y + 2'b10;
+					end
+					draw3_2: begin
+						draw_x <= ball_x + 2'b11;
+						draw_y <= ball_y + 2'b10;
+					end
+					draw1_3: begin
+						draw_x <= ball_x + 1'b1;
+						draw_y <= ball_y + 2'b11;
+					end
+					draw2_3: begin
+						draw_x <= ball_x + 2'b10;
+						draw_y <= ball_y + 2'b11;
+					end
+				endcase
+			end
+        else if (draw_paddle) begin
+            writeEn <= 1'b1; 
+            draw_x <= paddle_x + counter_1;
+			draw_y <= SCREEN_HEIGHT - counter_2;
+			colour <= 3'b011;	
+        end
+    end
     
     // Ball movement/bounce logic
     always @ (posedge clk) begin
@@ -273,20 +411,8 @@ module datapath(
             ball_y <= 8'd0;
 			ball_direction <= 8'd0;
         end
-        else if (move_objects
-            if (ld_values)
-				begin
-					divisor <= data_in[3:0];
-					dividend <= data_in[7:4];
-				end
-            if (ld_q)
-                quotient <= alu_out[3:0];
-            if (ld_r)
-                remainder <= alu_out[3:0];
-            if (reset_a)
-                reg_A <= 5'd0;
-            else if (ld_A)
-                reg_A <= alu_out[4:0];
+        else if (move_objects) begin
+		
         end
     end
 	
@@ -296,19 +422,7 @@ module datapath(
             paddle_x <= 8'd0; 
         end
         else if (move_objects
-            if (ld_values)
-				begin
-					divisor <= data_in[3:0];
-					dividend <= data_in[7:4];
-				end
-            if (ld_q)
-                quotient <= alu_out[3:0];
-            if (ld_r)
-                remainder <= alu_out[3:0];
-            if (reset_a)
-                reg_A <= 5'd0;
-            else if (ld_A)
-                reg_A <= alu_out[4:0];
+		
         end
     end
     

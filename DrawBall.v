@@ -111,8 +111,8 @@ module control(
                 draw2_2 = 4'd8,
                 draw3_2 = 4'd9,
                 draw1_3 = 4'd10,
-					 draw2_3 = 4'd11,
-					 drawnone = 4'd12;
+				draw2_3 = 4'd11,
+				drawnone = 4'd12;
     
     // Next state logic aka our state table
     always@(*)
