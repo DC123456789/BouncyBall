@@ -71,17 +71,18 @@ module BouncyBall
 	// for the VGA controller, in addition to any other functionality your design may require.
     
     // lots of wires to connect our datapath and control
-    wire draw_background, draw_ball, draw_paddle, move_objects, bounce_ball, reset_ball, left_key, right_key; 
+    wire draw_background, draw_ball, draw_paddle, move_objects, bounce_ball, reset_ball, reset_paddle, left_key, right_key, go_key; 
 	wire [7:0] ball_x, ball_y, paddle_x;
 	wire [9:0] counter_1, counter_2;
 	
 	// Controller keys
 	assign left_key = KEY[3];
 	assign right_key = KEY[0];
+	assign go_key = KEY[1];
 
     // Instantiate datapath
     datapath D0(
-        .clk(clk),
+        .clk(CLOCK_50),
         .resetn(resetn),
 
         .draw_background(draw_background), 
@@ -101,20 +102,19 @@ module BouncyBall
 		.ball_x(ball_x),
 		.ball_y(ball_y),
 		.paddle_x(paddle_x),
-		.ball_direction(ball_direction),
 		
 		.writeEn(writeEn),
         .draw_x(x),
-        .draw_y(y)
-        .colour(colour),
+        .draw_y(y),
+        .colour(colour)
     );
 
     // Instantiate FSM control
     control C0(
-        .clk(clk),
+        .clk(CLOCK_50),
         .resetn(resetn),
         
-        .go(go),
+        .go(go_key),
         
 		.ball_x(ball_x),
 		.ball_y(ball_y),
@@ -126,6 +126,7 @@ module BouncyBall
         .move_objects(move_objects), 
         .bounce_ball(bounce_ball),
         .reset_ball(reset_ball),
+		.reset_paddle(reset_paddle),
 		
         .counter_1(counter_1),
         .counter_2(counter_2)
@@ -151,8 +152,8 @@ module control(
 	
 	localparam	SCREEN_WIDTH			= 8'd160,
 				SCREEN_HEIGHT			= 8'd120,
-				NUM_OF_BALL_PIXELS		= 4'd12;
-				PADDLE_WIDTH			= 5'd18;
+				NUM_OF_BALL_PIXELS		= 4'd12,
+				PADDLE_WIDTH			= 5'd18,
 				PADDLE_HEIGHT			= 2'd2;
     
     localparam  S_INITIALIZE  					= 4'd0,
@@ -201,11 +202,11 @@ module control(
         else if(current_state == S_DRAW_PADDLE_NEXT_ROW && counter_2 > PADDLE_HEIGHT)
             next_state = S_WAIT;
         else if(current_state == S_WAIT)
-            next_state = go ? S_WAIT : S_MOVE; // Loop in current state until go signal goes low
-        else if(current_state == S_MOVE)
-            next_state = S_MOVE;
-        else if(current_state == S_BOUNCE)
-            next_state = S_MOVE;
+            next_state = go ? S_WAIT : S_MOVE_BALL; // Loop in current state until go signal goes low
+        else if(current_state == S_MOVE_BALL)
+            next_state = S_WAIT;
+        else if(current_state == S_BOUNCE_BALL)
+            next_state = S_MOVE_BALL;
         else
             next_state = S_INITIALIZE;
     end // state_FFs
@@ -265,12 +266,6 @@ module control(
 				incCounter_2 = 1'b1;
 				reset_counter_1 = 1'b1;
                 end
-            S_MOVE: begin
-                move_objects = 1'b1;
-                end
-            S_BOUNCE: begin				// Set Dividend in Quotient register (Q <= Dividend + 0)
-				bounce_ball = 1'b1;
-                end
         // default:    // don't need default since we already made sure all of our outputs were assigned a value at the start of the always block
         endcase
     end // enable_signals
@@ -279,7 +274,7 @@ module control(
     always@(posedge clk)
     begin: state_FFs2
         if(resetn)
-            current_state <= S_LOAD;
+            current_state <= S_INITIALIZE;
         else
             current_state <= next_state;
     end // state_FFS2
@@ -312,10 +307,11 @@ module datapath(
     input left_key, right_key,
 	
 	output reg [7:0] ball_x, ball_y, paddle_x,
-	output reg [1:0] ball_direction,			// 0 = 45°, 1 = 135°, 2 = 225°, 3 = 315°
     output reg writeEn, draw_x, draw_y,
 	output reg [2:0] colour
     );
+	
+	reg [1:0] ball_direction;			// 0 = 45°, 1 = 135°, 2 = 225°, 3 = 315°
 	
 	localparam	SCREEN_WIDTH			= 8'd160,
 				SCREEN_HEIGHT			= 8'd120;
@@ -342,7 +338,7 @@ module datapath(
 			draw_y <= counter_2;
 			colour <= 3'b000;
         end
-        else if (draw_ball)
+        else if (draw_ball) begin
 			writeEn <= 1'b1;
 			begin: set_pixel_location
 				draw_x <= ball_x;
@@ -396,6 +392,7 @@ module datapath(
 					end
 				endcase
 			end
+		end
         else if (draw_paddle) begin
             writeEn <= 1'b1; 
             draw_x <= paddle_x + counter_1;
@@ -421,7 +418,7 @@ module datapath(
         if (resetn || reset_paddle) begin
             paddle_x <= 8'd0; 
         end
-        else if (move_objects
+        else if (move_objects) begin
 		
         end
     end
