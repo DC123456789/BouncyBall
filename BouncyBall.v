@@ -42,28 +42,28 @@ module BouncyBall
 	// Create an Instance of a VGA controller - there can be only one!
 	// Define the number of colours as well as the initial background
 	// image file (.MIF) for the controller.
-	// vga_adapter VGA(
-		// .resetn(resetn),
-		// .clock(CLOCK_50),
-		// .colour(colour),
-		// .x(x),
-		// .y(y),
-		// .plot(writeEn),
-		// /* Signals for the DAC to drive the monitor. */
-		// .VGA_R(VGA_R),
-		// .VGA_G(VGA_G),
-		// .VGA_B(VGA_B),
-		// .VGA_HS(VGA_HS),
-		// .VGA_VS(VGA_VS),
-		// .VGA_BLANK(VGA_BLANK_N),
-		// .VGA_SYNC(VGA_SYNC_N),
-		// .VGA_CLK(VGA_CLK)
-	// );
+	vga_adapter VGA(
+		.resetn(resetn),
+		.clock(CLOCK_50),
+		.colour(colour),
+		.x(x),
+		.y(y),
+		.plot(writeEn),
+		/* Signals for the DAC to drive the monitor. */
+		.VGA_R(VGA_R),
+		.VGA_G(VGA_G),
+		.VGA_B(VGA_B),
+		.VGA_HS(VGA_HS),
+		.VGA_VS(VGA_VS),
+		.VGA_BLANK(VGA_BLANK_N),
+		.VGA_SYNC(VGA_SYNC_N),
+		.VGA_CLK(VGA_CLK)
+	);
 	
-	// defparam VGA.RESOLUTION = "160x120";
-	// defparam VGA.MONOCHROME = "FALSE";
-	// defparam VGA.BITS_PER_COLOUR_CHANNEL = 1;
-	// defparam VGA.BACKGROUND_IMAGE = "black.mif";
+	defparam VGA.RESOLUTION = "160x120";
+	defparam VGA.MONOCHROME = "FALSE";
+	defparam VGA.BITS_PER_COLOUR_CHANNEL = 1;
+	defparam VGA.BACKGROUND_IMAGE = "black.mif";
 			
 	// Put your code here. Your code should produce signals x,y,colour and writeEn/plot
 	// for the VGA controller, in addition to any other functionality your design may require.
@@ -76,8 +76,8 @@ module BouncyBall
 	wire [24:0] counter_1, counter_2;
 	
 	// Controller keys
-	assign left_key = KEY[3];
-	assign right_key = KEY[0];
+	assign left_key = !KEY[3];
+	assign right_key = !KEY[0];
 	assign go_key = KEY[1];
 
     // Instantiate datapath
@@ -166,7 +166,7 @@ module control(
 				PADDLE_WIDTH			= 5'd18,
 				PADDLE_HEIGHT			= 2'd2,
 				//WAIT_CYCLES				= 5'b5;		// For ModelSim Testing purposes
-				WAIT_CYCLES				= 24'd12500000;		// ~4 cycles per second
+				WAIT_CYCLES				= 24'd3125000;		// ~4 cycles per second
     
     localparam  S_INITIALIZE  					= 4'd0,
 				S_START_DRAW_BACKGROUND			= 4'd1,
@@ -177,12 +177,14 @@ module control(
 				S_START_DRAW_PADDLE				= 4'd6,
 				S_DRAW_PADDLE_ROW				= 4'd7,
 				S_DRAW_PADDLE_NEXT_ROW			= 4'd8,
-                S_START_WAIT   					= 4'd9,
-                S_WAIT   						= 4'd10,
+                S_START_WAIT_1 					= 4'd9,
+                S_WAIT_1   						= 4'd10,
 				S_CHECK_BALL_TOUCHING_1			= 4'd11,
 				S_CHECK_BALL_TOUCHING_2			= 4'd12,
                 S_BOUNCE_BALL					= 4'd13,
-				S_MOVE_OBJECTS					= 4'd14;
+				S_MOVE_OBJECTS					= 4'd14,
+                S_START_WAIT_2 					= 4'd15,
+                S_WAIT_2   						= 4'd16;
     
     // Next state logic aka our state table
 	// Current model: Intialize -> Draw Screen -> Wait -> Move Objects -> Draw Screen - > Wait -> etc.
@@ -215,12 +217,12 @@ module control(
         else if(current_state == S_DRAW_PADDLE_NEXT_ROW && counter_2 < PADDLE_HEIGHT - 1)
             next_state <= S_DRAW_PADDLE_ROW;
         else if(current_state == S_DRAW_PADDLE_NEXT_ROW && counter_2 >= PADDLE_HEIGHT - 1)
-            next_state <= S_START_WAIT;
-        else if (current_state == S_START_WAIT)
-            next_state <= S_WAIT;
-        else if(current_state == S_WAIT && counter_1 < WAIT_CYCLES - 1)
-            next_state <= S_WAIT;
-        else if(current_state == S_WAIT && counter_1 >= WAIT_CYCLES - 1)
+            next_state <= S_START_WAIT_1;
+        else if (current_state == S_START_WAIT_1)
+            next_state <= S_WAIT_1;
+        else if(current_state == S_WAIT_1 && counter_1 < WAIT_CYCLES - 1)
+            next_state <= S_WAIT_1;
+        else if(current_state == S_WAIT_1 && counter_1 >= WAIT_CYCLES - 1)
             next_state <= S_CHECK_BALL_TOUCHING_1;
         else if (current_state == S_CHECK_BALL_TOUCHING_1)
             next_state <= S_CHECK_BALL_TOUCHING_2;
@@ -292,10 +294,10 @@ module control(
 				incCounter_2 = 1'b1;
 				reset_counter_1 = 1'b1;
             end
-            S_START_WAIT: begin
+            S_START_WAIT_1: begin
 				reset_counter_1 = 1'b1;
             end
-            S_WAIT: begin
+            S_WAIT_1: begin
 				incCounter_1 = 1'b1;
             end
 			S_CHECK_BALL_TOUCHING_1: begin
@@ -370,7 +372,7 @@ module datapath(
 				PADDLE_HEIGHT			= 2'd2,
 				BALL_START_X			= 8'd78,
 				BALL_START_Y			= 8'd58,
-				PADDLE_START_X		= 8'd78;
+				PADDLE_START_X		= 8'd71;
 				
 	// Ball drawing parameters
 	localparam  draw1_0 = 4'd0,
@@ -526,7 +528,7 @@ module datapath(
     // Paddle movement logic
     always @ (posedge clk) begin
         if (!resetn || reset_paddle) begin
-            paddle_x <= 8'd0; 
+            paddle_x <= PADDLE_START_X; 
         end
         else if (move_objects) begin
 			// Logic for moving the ball based on left_key and right_key
@@ -549,12 +551,14 @@ module datapath(
 					ball_touching_wall <= 1'b1;
 			else if (ball_x >= SCREEN_WIDTH - 3'b100)
 				   ball_touching_wall <= 1'b1;
-			else if (ball_y == SCREEN_HEIGHT - 3'b110 && ball_direction == 2'b01)
-				  if (paddle_x - 3'b100 <= ball_x <= paddle_x + PADDLE_WIDTH - 2'b10)
+			else if (ball_y == SCREEN_HEIGHT - 3'b110 && ball_direction == 2'b01) begin
+				  if (paddle_x - 3'b100 <= ball_x && ball_x <= paddle_x + PADDLE_WIDTH - 2'b10)
 						ball_touching_wall <= 1'b1;
-			else if (ball_y == SCREEN_HEIGHT - 3'b110 && ball_direction == 2'b10)
-				  if (paddle_x - 2'b10 <= ball_x <= paddle_x + PADDLE_WIDTH)
+			end
+			else if (ball_y == SCREEN_HEIGHT - 3'b110 && ball_direction == 2'b10) begin
+				  if (paddle_x - 2'b10 <= ball_x && ball_x <= paddle_x + PADDLE_WIDTH)
 						ball_touching_wall <= 1'b1;
+			end
 			else
 				ball_touching_wall <= 1'b0;
 		end
