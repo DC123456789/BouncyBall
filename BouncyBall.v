@@ -89,7 +89,8 @@ module BouncyBall
         .draw_ball(draw_ball), 
         .draw_paddle(draw_paddle), 
 		.check_ball_touching(check_ball_touching),
-        .move_objects(move_objects), 
+        .move_ball(move_ball), 
+		  .move_paddle(move_paddle),
         .bounce_ball(bounce_ball),
         .reset_ball(reset_ball),
 		.reset_paddle(reset_paddle),
@@ -127,7 +128,8 @@ module BouncyBall
         .draw_ball(draw_ball), 
         .draw_paddle(draw_paddle), 
 		.check_ball_touching(check_ball_touching),
-        .move_objects(move_objects), 
+        .move_ball(move_ball), 
+		  .move_paddle(move_paddle),
         .bounce_ball(bounce_ball),
         .reset_ball(reset_ball),
 		.reset_paddle(reset_paddle),
@@ -150,12 +152,13 @@ module control(
 	input [7:0] paddle_x,
 	input ball_touching_wall,
 
-    output reg draw_background, draw_ball, draw_paddle, check_ball_touching, move_objects, bounce_ball, reset_ball, reset_paddle,
+    output reg draw_background, draw_ball, draw_paddle, check_ball_touching, move_ball, move_paddle, bounce_ball, reset_ball, reset_paddle,
 	output reg [24:0] counter_1, counter_2
     );
 
     reg [4:0] current_state, next_state;
-	reg incCounter_1, incCounter_2, reset_counter_1, reset_counter_2;
+	reg incCounter_1, incCounter_2, incCounter_3, reset_counter_1, reset_counter_2, reset_counter_3;
+	reg [10:0] counter_3;
 	
 	localparam	//SCREEN_WIDTH			= 8'd8,				// For ModelSim Testing purposes
 				//SCREEN_HEIGHT			= 7'd4,
@@ -166,25 +169,25 @@ module control(
 				PADDLE_WIDTH			= 5'd18,
 				PADDLE_HEIGHT			= 2'd2,
 				//WAIT_CYCLES				= 5'b5;		// For ModelSim Testing purposes
-				WAIT_CYCLES				= 24'd3125000;		// ~4 cycles per second
+				WAIT_CYCLES				= 24'd1562500;		// ~32 cycles per second
     
-    localparam  S_INITIALIZE  					= 4'd0,
-				S_START_DRAW_BACKGROUND			= 4'd1,
-				S_DRAW_BACKGROUND_ROW			= 4'd2,
-				S_DRAW_BACKGROUND_NEXT_ROW		= 4'd3,
-				S_START_DRAW_BALL				= 4'd4,
-				S_DRAW_BALL	  					= 4'd5,
-				S_START_DRAW_PADDLE				= 4'd6,
-				S_DRAW_PADDLE_ROW				= 4'd7,
-				S_DRAW_PADDLE_NEXT_ROW			= 4'd8,
-                S_START_WAIT_1 					= 4'd9,
-                S_WAIT_1   						= 4'd10,
-				S_CHECK_BALL_TOUCHING_1			= 4'd11,
-				S_CHECK_BALL_TOUCHING_2			= 4'd12,
-                S_BOUNCE_BALL					= 4'd13,
-				S_MOVE_OBJECTS					= 4'd14,
-                S_START_WAIT_2 					= 4'd15,
-                S_WAIT_2   						= 4'd16;
+    localparam  S_INITIALIZE  					= 5'd0,
+				S_START_DRAW_BACKGROUND				= 5'd1,
+				S_DRAW_BACKGROUND_ROW				= 5'd2,
+				S_DRAW_BACKGROUND_NEXT_ROW			= 5'd3,
+				S_START_DRAW_BALL			   		= 5'd4,
+				S_DRAW_BALL	  							= 5'd5,
+				S_START_DRAW_PADDLE					= 5'd6,
+				S_DRAW_PADDLE_ROW						= 5'd7,
+				S_DRAW_PADDLE_NEXT_ROW				= 5'd8,
+            S_START_WAIT_1 						= 5'd9,
+            S_WAIT_1   								= 5'd10,
+				S_CHECK_BALL_TOUCHING_1				= 5'd11,
+				S_CHECK_BALL_TOUCHING_2				= 5'd12,
+            S_BOUNCE_BALL							= 5'd13,
+				S_MOVE_BALL								= 5'd14,
+				S_MOVE_PADDLE							= 5'd15;
+			//	S_GAME_OVER                      = 5'd16;
     
     // Next state logic aka our state table
 	// Current model: Intialize -> Draw Screen -> Wait -> Move Objects -> Draw Screen - > Wait -> etc.
@@ -223,16 +226,20 @@ module control(
         else if(current_state == S_WAIT_1 && counter_1 < WAIT_CYCLES - 1)
             next_state <= S_WAIT_1;
         else if(current_state == S_WAIT_1 && counter_1 >= WAIT_CYCLES - 1)
+            next_state <= S_MOVE_PADDLE;
+        else if(current_state == S_MOVE_PADDLE && !counter_3[0])
             next_state <= S_CHECK_BALL_TOUCHING_1;
+        else if(current_state == S_MOVE_PADDLE && counter_3[0])
+            next_state <= S_START_DRAW_BACKGROUND;
         else if (current_state == S_CHECK_BALL_TOUCHING_1)
             next_state <= S_CHECK_BALL_TOUCHING_2;
         else if(current_state == S_CHECK_BALL_TOUCHING_2 && ball_touching_wall)
             next_state <= S_BOUNCE_BALL;
         else if(current_state == S_CHECK_BALL_TOUCHING_2 && !ball_touching_wall)
-            next_state <= S_MOVE_OBJECTS;
+            next_state <= S_MOVE_BALL;
         else if(current_state == S_BOUNCE_BALL)
-            next_state <= S_MOVE_OBJECTS;
-        else if(current_state == S_MOVE_OBJECTS)
+            next_state <= S_MOVE_BALL;
+        else if(current_state == S_MOVE_BALL)
             next_state <= S_START_DRAW_BACKGROUND;
         else
             next_state <= S_INITIALIZE;
@@ -247,14 +254,17 @@ module control(
 		draw_ball = 1'b0;
 		draw_paddle = 1'b0;
 		check_ball_touching = 1'b0;
-        move_objects = 1'b0;
+        move_ball = 1'b0;
+        move_paddle = 1'b0;
 		bounce_ball = 1'b0;
 		reset_ball = 1'b0;
 		reset_paddle = 1'b0;
 		reset_counter_1 = 1'b0;
 		reset_counter_2 = 1'b0;
+		reset_counter_3 = 1'b0;
 		incCounter_1 = 1'b0;
 		incCounter_2 = 1'b0;
+		incCounter_3 = 1'b0;
 
         case (current_state)
             S_INITIALIZE: begin
@@ -262,6 +272,7 @@ module control(
 				reset_paddle = 1'b1;
 				reset_counter_1 = 1'b1;
 				reset_counter_2 = 1'b1;
+				reset_counter_3 = 1'b1;
             end
             S_START_DRAW_BACKGROUND: begin
 				reset_counter_1 = 1'b1;
@@ -306,9 +317,13 @@ module control(
 			S_BOUNCE_BALL: begin
 				bounce_ball = 1'b1;
 			end	
-			S_MOVE_OBJECTS: begin
-				move_objects = 1'b1;
-			end				
+			S_MOVE_BALL: begin
+				move_ball = 1'b1;
+			end		
+			S_MOVE_PADDLE: begin
+				move_paddle = 1'b1;
+				incCounter_3 = 1'b1;
+			end			
         // default:    // don't need default since we already made sure all of our outputs were assigned a value at the start of the always block
         endcase
     end // enable_signals
@@ -339,12 +354,21 @@ module control(
         else if(incCounter_2)
             counter_2 <= counter_2 + 1'b1;
     end
+	
+    // handle counter 3
+    always@(posedge clk)
+    begin: counter_3_FFs
+        if(!resetn || reset_counter_3)
+            counter_3 <= 10'b0;
+        else if(incCounter_3)
+            counter_3 <= counter_3 + 1'b1;
+    end
 endmodule
 
 module datapath(
     input clk,
     input resetn,
-    input draw_background, draw_ball, draw_paddle, check_ball_touching, move_objects, bounce_ball, reset_ball, reset_paddle,
+    input draw_background, draw_ball, draw_paddle, check_ball_touching, move_ball, move_paddle, bounce_ball, reset_ball, reset_paddle,
 	input [24:0] counter_1, counter_2,
 
     input left_key, right_key,
@@ -509,7 +533,7 @@ module datapath(
 						 ball_direction <= 2'b00;
 					 end
 			end
-        else if (move_objects) begin
+        else if (move_ball) begin
 			// Logic for moving the ball based on ball_direction
 				if (ball_direction == 2'b00)begin
 					 ball_x <= ball_x + 1'b1;
@@ -535,7 +559,7 @@ module datapath(
         if (!resetn || reset_paddle) begin
             paddle_x <= PADDLE_START_X; 
         end
-        else if (move_objects) begin
+        else if (move_paddle) begin
 			// Logic for moving the ball based on left_key and right_key
 				if (left_key == 1'b1 && paddle_x > 8'd1)
 					 paddle_x <= paddle_x - 1'b1;
