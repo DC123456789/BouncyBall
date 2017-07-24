@@ -166,9 +166,9 @@ module control(
 				NUM_OF_BALL_PIXELS		= 4'd12,
 				//PADDLE_WIDTH			= 5'd4,		// For ModelSim Testing purposes
 				PADDLE_WIDTH			= 5'd18,
-				PADDLE_HEIGHT			= 2'd2;
+				PADDLE_HEIGHT			= 2'd2,
 				//WAIT_CYCLES				= 5'b5;		// For ModelSim Testing purposes
-				WAIT_CYCLES				= 24'b12500000;		// ~4 cycles per second
+				WAIT_CYCLES				= 24'd12500000;		// ~4 cycles per second
     
     localparam  S_INITIALIZE  					= 4'd0,
 				S_START_DRAW_BACKGROUND			= 4'd1,
@@ -193,9 +193,9 @@ module control(
             next_state <= S_START_DRAW_BACKGROUND;
         else if (current_state == S_START_DRAW_BACKGROUND)
             next_state <= S_DRAW_BACKGROUND_ROW;			
-        else if(current_state == S_DRAW_BACKGROUND_ROW && counter_1 < SCREEN_WIDTH)
+        else if(current_state == S_DRAW_BACKGROUND_ROW && counter_1 < SCREEN_WIDTH - 1)
             next_state <= S_DRAW_BACKGROUND_ROW;
-        else if(current_state == S_DRAW_BACKGROUND_ROW && counter_1 >= SCREEN_WIDTH)
+        else if(current_state == S_DRAW_BACKGROUND_ROW && counter_1 >= SCREEN_WIDTH - 1)
             next_state <= S_DRAW_BACKGROUND_NEXT_ROW;
         else if(current_state == S_DRAW_BACKGROUND_NEXT_ROW && counter_2 < SCREEN_HEIGHT - 1)
             next_state <= S_DRAW_BACKGROUND_ROW;
@@ -203,15 +203,15 @@ module control(
             next_state <= S_START_DRAW_BALL;
         else if (current_state == S_START_DRAW_BALL)
             next_state <= S_DRAW_BALL;		
-        else if(current_state == S_DRAW_BALL && counter_1 < NUM_OF_BALL_PIXELS)
+        else if(current_state == S_DRAW_BALL && counter_1 < NUM_OF_BALL_PIXELS - 1)
             next_state <= S_DRAW_BALL;		
-        else if(current_state == S_DRAW_BALL && counter_1 >= NUM_OF_BALL_PIXELS)
+        else if(current_state == S_DRAW_BALL && counter_1 >= NUM_OF_BALL_PIXELS - 1)
             next_state <= S_START_DRAW_PADDLE;
         else if (current_state == S_START_DRAW_PADDLE)
             next_state <= S_DRAW_PADDLE_ROW;		
-        else if(current_state == S_DRAW_PADDLE_ROW && counter_1 < PADDLE_WIDTH)
+        else if(current_state == S_DRAW_PADDLE_ROW && counter_1 < PADDLE_WIDTH - 1)
             next_state <= S_DRAW_PADDLE_ROW;		
-        else if(current_state == S_DRAW_PADDLE_ROW && counter_1 >= PADDLE_WIDTH)
+        else if(current_state == S_DRAW_PADDLE_ROW && counter_1 >= PADDLE_WIDTH - 1)
             next_state <= S_DRAW_PADDLE_NEXT_ROW;
         else if(current_state == S_DRAW_PADDLE_NEXT_ROW && counter_2 < PADDLE_HEIGHT - 1)
             next_state <= S_DRAW_PADDLE_ROW;
@@ -485,7 +485,7 @@ module datapath(
 	
     // Determining if the ball is touching the wall or paddle logic
     always @ (posedge clk) begin
-		ball_touching_wall <= 1'b0
+		ball_touching_wall <= 1'b0;
         //if (check_ball_touching && ) begin 		<- Logic for determining if the ball is touching the paddle
         //    ball_touching_wall <= 1'b1; 
        // end
