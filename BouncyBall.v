@@ -184,10 +184,10 @@ module control(
             S_WAIT_1   								= 5'd10,
 				S_CHECK_BALL_TOUCHING_1				= 5'd11,
 				S_CHECK_BALL_TOUCHING_2				= 5'd12,
-            S_BOUNCE_BALL							= 5'd13,
+        		        S_BOUNCE_BALL							= 5'd13,
 				S_MOVE_BALL								= 5'd14,
 				S_MOVE_PADDLE							= 5'd15;
-			//	S_GAME_OVER                      = 5'd16;
+				S_GAME_OVER                      = 5'd16;
     
     // Next state logic aka our state table
 	// Current model: Intialize -> Draw Screen -> Wait -> Move Objects -> Draw Screen - > Wait -> etc.
@@ -237,10 +237,14 @@ module control(
             next_state <= S_BOUNCE_BALL;
         else if(current_state == S_CHECK_BALL_TOUCHING_2 && !ball_touching_wall)
             next_state <= S_MOVE_BALL;
+	else if (current_state == S_MOVE_BALL && ball_hitting_floor)
+		 next_state <= S_GAME_OVER;
         else if(current_state == S_BOUNCE_BALL)
             next_state <= S_MOVE_BALL;
         else if(current_state == S_MOVE_BALL)
             next_state <= S_START_DRAW_BACKGROUND;
+	    else if (current_state == S_GAME_OVER)
+		    next_state <= S_INITIALIZE;
         else
             next_state <= S_INITIALIZE;
     end // state_FFs
@@ -572,6 +576,7 @@ module datapath(
     always @ (posedge clk) begin         //<- Logic for determining if the ball is touching the paddle
         if (!resetn) begin
             ball_touching_wall <= 1'b0; 
+	    ball_hitting_floor <= 1'b0;
         end
 		else if (check_ball_touching) begin
 			if (ball_x <= 8'b1)  //we are having cases just so the code is more readable
@@ -583,13 +588,19 @@ module datapath(
 			else if (ball_y == SCREEN_HEIGHT - 3'b111 && ball_direction == 2'b01) begin
 				  if (paddle_x - 3'b100 <= ball_x && ball_x <= paddle_x + PADDLE_WIDTH - 2'b10)
 						ball_touching_wall <= 1'b1;
+				else
+					ball_hitting_floor <= 1'b1;
 			end
 			else if (ball_y == SCREEN_HEIGHT - 3'b111 && ball_direction == 2'b10) begin
 				  if (paddle_x - 2'b10 <= ball_x && ball_x <= paddle_x + PADDLE_WIDTH)
 						ball_touching_wall <= 1'b1;
+				else 
+					ball_hitting_floor <= 1'b1;
 			end
-			else
+			else begin
 				ball_touching_wall <= 1'b0;
+			        ball_hitting_floor <= 1'b0;
+		         end
 		end
     end
     
