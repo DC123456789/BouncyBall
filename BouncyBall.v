@@ -1,5 +1,3 @@
-// Part 2 skeleton
-
 module BouncyBall
 	(
 		CLOCK_50,						//	On Board 50 MHz
@@ -202,7 +200,7 @@ module control(
         else if(current_state == S_DRAW_BACKGROUND_NEXT_ROW && counter_2 >= SCREEN_HEIGHT - 1)
             next_state <= S_START_DRAW_BALL;
         else if (current_state == S_START_DRAW_BALL)
-            next_state <= S_DRAW_BALL;		
+            next_state <= S_DRAW_BALL;		          
         else if(current_state == S_DRAW_BALL && counter_1 < NUM_OF_BALL_PIXELS - 1)
             next_state <= S_DRAW_BALL;		
         else if(current_state == S_DRAW_BALL && counter_1 >= NUM_OF_BALL_PIXELS - 1)
@@ -365,6 +363,8 @@ module datapath(
 				// BALL_START_X			= 8'd0,		// For ModelSim Testing purposes
 				// BALL_START_Y			= 8'd0,
 				// PADDLE_START_X			= 8'd0;
+				PADDLE_WIDTH			= 5'd18,
+				PADDLE_HEIGHT			= 2'd2,
 				BALL_START_X			= 8'd78,
 				BALL_START_Y			= 8'd58,
 				PADDLE_START_X		= 8'd78;
@@ -453,8 +453,8 @@ module datapath(
         else if (draw_paddle) begin
             writeEn <= 1'b1; 
             draw_x <= paddle_x + counter_1;
-			draw_y <= SCREEN_HEIGHT - counter_2 - 1;
-			colour <= 3'b011;	
+			draw_y <= SCREEN_HEIGHT - counter_2 - 1;  
+			colour <= 3'b011;	                       
         end
     end
     
@@ -466,11 +466,58 @@ module datapath(
 			ball_direction <= 2'd0;
         end
         else if (bounce_ball) begin
-			ball_direction <= ball_direction + 1'b1;
-        end
+				if (ball_x == 8'b0 && ball_y == 7'b0)
+				 	 ball_direction <= 2'b01;
+				else if (ball_x == SCREEN_WIDTH - 3'b100 && ball_y == 7'b0)
+					 ball_direction <= 2'b10;
+				else if (ball_x == 8'b0 && ball_y == SCREEN_HEIGHT - 3'b110)
+					 ball_direction <= 2'b00;
+				else if (ball_x == SCREEN_WIDTH - 3'b100 && ball_y == SCREEN_HEIGHT - 3'b110)
+					 ball_direction <= 2'b11;
+				else if (ball_x == 8'b0)begin
+					 if (ball_direction == 2'b11)
+					 	 ball_direction <= 2'b00;
+					 else if (ball_direction == 2'b10)
+						 ball_direction <= 2'b01;
+					 end
+				else if (ball_y == 8'b0)begin
+					 if (ball_direction == 2'b00)
+					 	 ball_direction <= 2'b01;
+					 else if (ball_direction == 2'b11)
+						 ball_direction <= 2'b10;
+					 end
+				else if (ball_x == SCREEN_WIDTH - 3'b100)begin
+					 if (ball_direction == 2'b01)
+						 ball_direction <= 2'b10;
+					 else if (ball_direction == 2'b00)
+						 ball_direction <= 2'b11;
+					 end
+				else if (ball_y == SCREEN_HEIGHT - 3'b110)begin
+					 if (ball_direction == 2'b10)
+						 ball_direction <= 2'b11;
+					 else if (ball_direction == 2'b01)
+						 ball_direction <= 2'b00;
+					 end
+			end
         else if (move_objects) begin
 			// Logic for moving the ball based on ball_direction
-        end
+				if (ball_direction == 2'b00)begin
+					 ball_x <= ball_x + 1'b1;
+					 ball_y <= ball_y - 1'b1;
+					 end
+				else if (ball_direction == 2'b01)begin
+					 ball_x <= ball_x + 1'b1;
+					 ball_y <= ball_y + 1'b1;
+					 end
+				else if (ball_direction == 2'b10)begin
+					 ball_x <= ball_x - 1'b1;
+					 ball_y <= ball_y + 1'b1;
+					 end
+				else if (ball_direction == 2'b11)begin
+					 ball_x <= ball_x - 1'b1;
+					 ball_y <= ball_y - 1'b1;
+					 end
+				end
     end
 	
     // Paddle movement logic
@@ -479,16 +526,30 @@ module datapath(
             paddle_x <= 8'd0; 
         end
         else if (move_objects) begin
-			// Logic for moving the ball based on left_key and right_key		
+			// Logic for moving the ball based on left_key and right_key
+				if (left_key == 1'b1 && paddle_x != 8'd0)
+					 paddle_x <= paddle_x - 1'b1;
+				else if (right_key == 1'b1 && paddle_x != SCREEN_WIDTH - PADDLE_WIDTH)
+					 paddle_x <= paddle_x + 1'b1;
         end
     end
 	
     // Determining if the ball is touching the wall or paddle logic
-    always @ (posedge clk) begin
-		ball_touching_wall <= 1'b0;
-        //if (check_ball_touching && ) begin 		<- Logic for determining if the ball is touching the paddle
-        //    ball_touching_wall <= 1'b1; 
-       // end
+    always @ (posedge clk) begin         //<- Logic for determining if the ball is touching the paddle
+	 if (check_ball_touching)begin
+		if (ball_x == 8'b0)  //we are having cases just so the code is more readable
+				ball_touching_wall <= 1'b1;
+		else if (ball_y == 7'b0)
+				ball_touching_wall <= 1'b1;
+		else if (ball_x >= SCREEN_WIDTH - 3'b100)
+			   ball_touching_wall <= 1'b1;
+		else if (ball_y == SCREEN_HEIGHT - 3'b110 && ball_direction == 2'b01)
+			  if (paddle_x - 3'b100 <= ball_x <= paddle_x + PADDLE_WIDTH - 2'b10)
+					ball_touching_wall <= 1'b1;
+		else if (ball_y == SCREEN_HEIGHT - 3'b110 && ball_direction == 2'b10)
+			  if (paddle_x - 2'b10 <= ball_x <= paddle_x + PADDLE_WIDTH)
+					ball_touching_wall <= 1'b1;
+		end
     end
     
 endmodule
