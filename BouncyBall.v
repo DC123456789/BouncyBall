@@ -179,9 +179,10 @@ module control(
 				S_DRAW_PADDLE_NEXT_ROW			= 4'd8,
                 S_START_WAIT   					= 4'd9,
                 S_WAIT   						= 4'd10,
-				S_CHECK_BALL_TOUCHING			= 4'd11,
-                S_BOUNCE_BALL					= 4'd12,
-				S_MOVE_OBJECTS					= 4'd13;
+				S_CHECK_BALL_TOUCHING_1			= 4'd11,
+				S_CHECK_BALL_TOUCHING_2			= 4'd12,
+                S_BOUNCE_BALL					= 4'd13,
+				S_MOVE_OBJECTS					= 4'd14;
     
     // Next state logic aka our state table
 	// Current model: Intialize -> Draw Screen -> Wait -> Move Objects -> Draw Screen - > Wait -> etc.
@@ -220,10 +221,12 @@ module control(
         else if(current_state == S_WAIT && counter_1 < WAIT_CYCLES - 1)
             next_state <= S_WAIT;
         else if(current_state == S_WAIT && counter_1 >= WAIT_CYCLES - 1)
-            next_state <= S_CHECK_BALL_TOUCHING;
-        else if(current_state == S_CHECK_BALL_TOUCHING && ball_touching_wall)
+            next_state <= S_CHECK_BALL_TOUCHING_1;
+        else if (current_state == S_CHECK_BALL_TOUCHING_1)
+            next_state <= S_CHECK_BALL_TOUCHING_2;
+        else if(current_state == S_CHECK_BALL_TOUCHING_2 && ball_touching_wall)
             next_state <= S_BOUNCE_BALL;
-        else if(current_state == S_CHECK_BALL_TOUCHING && !ball_touching_wall)
+        else if(current_state == S_CHECK_BALL_TOUCHING_2 && !ball_touching_wall)
             next_state <= S_MOVE_OBJECTS;
         else if(current_state == S_BOUNCE_BALL)
             next_state <= S_MOVE_OBJECTS;
@@ -295,7 +298,7 @@ module control(
             S_WAIT: begin
 				incCounter_1 = 1'b1;
             end
-			S_CHECK_BALL_TOUCHING: begin
+			S_CHECK_BALL_TOUCHING_1: begin
 				check_ball_touching = 1'b1;
 			end
 			S_BOUNCE_BALL: begin
@@ -536,20 +539,21 @@ module datapath(
 	
     // Determining if the ball is touching the wall or paddle logic
     always @ (posedge clk) begin         //<- Logic for determining if the ball is touching the paddle
-	 ball_touching_wall <= 1'b0;
-	 if (check_ball_touching)begin
-		if (ball_x == 8'b0)  //we are having cases just so the code is more readable
-				ball_touching_wall <= 1'b1;
-		else if (ball_y == 7'b0)
-				ball_touching_wall <= 1'b1;
-		else if (ball_x >= SCREEN_WIDTH - 3'b100)
-			   ball_touching_wall <= 1'b1;
-		else if (ball_y == SCREEN_HEIGHT - 3'b110 && ball_direction == 2'b01)
-			  if (paddle_x - 3'b100 <= ball_x <= paddle_x + PADDLE_WIDTH - 2'b10)
+		if (check_ball_touching) begin
+			if (ball_x == 8'b0)  //we are having cases just so the code is more readable
 					ball_touching_wall <= 1'b1;
-		else if (ball_y == SCREEN_HEIGHT - 3'b110 && ball_direction == 2'b10)
-			  if (paddle_x - 2'b10 <= ball_x <= paddle_x + PADDLE_WIDTH)
+			else if (ball_y == 7'b0)
 					ball_touching_wall <= 1'b1;
+			else if (ball_x >= SCREEN_WIDTH - 3'b100)
+				   ball_touching_wall <= 1'b1;
+			else if (ball_y == SCREEN_HEIGHT - 3'b110 && ball_direction == 2'b01)
+				  if (paddle_x - 3'b100 <= ball_x <= paddle_x + PADDLE_WIDTH - 2'b10)
+						ball_touching_wall <= 1'b1;
+			else if (ball_y == SCREEN_HEIGHT - 3'b110 && ball_direction == 2'b10)
+				  if (paddle_x - 2'b10 <= ball_x <= paddle_x + PADDLE_WIDTH)
+						ball_touching_wall <= 1'b1;
+			else
+				ball_touching_wall <= 1'b0;
 		end
     end
     
