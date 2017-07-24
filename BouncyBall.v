@@ -539,7 +539,10 @@ module datapath(
 	
     // Determining if the ball is touching the wall or paddle logic
     always @ (posedge clk) begin         //<- Logic for determining if the ball is touching the paddle
-		if (check_ball_touching) begin
+        if (!resetn) begin
+            ball_touching_wall <= 1'b0; 
+        end
+		else if (check_ball_touching) begin
 			if (ball_x == 8'b0)  //we are having cases just so the code is more readable
 					ball_touching_wall <= 1'b1;
 			else if (ball_y == 7'b0)
