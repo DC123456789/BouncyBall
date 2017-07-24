@@ -105,6 +105,7 @@ module BouncyBall
 		.ball_y(ball_y),
 		.paddle_x(paddle_x),
 		.ball_touching_wall(ball_touching_wall),
+		.ball_hitting_floor(ball_hitting_floor),
 		
 		.writeEn(writeEn),
         .draw_x(x),
@@ -123,6 +124,7 @@ module BouncyBall
 		.ball_y(ball_y),
 		.paddle_x(paddle_x),
 		.ball_touching_wall(ball_touching_wall),
+		.ball_hitting_floor(ball_hitting_floor),
 		
         .draw_background(draw_background), 
         .draw_ball(draw_ball), 
@@ -150,7 +152,7 @@ module control(
 	input [7:0] ball_x, 
 	input [6:0] ball_y,
 	input [7:0] paddle_x,
-	input ball_touching_wall,
+	input ball_touching_wall, ball_hitting_floor,
 
     output reg draw_background, draw_ball, draw_paddle, check_ball_touching, move_ball, move_paddle, bounce_ball, reset_ball, reset_paddle,
 	output reg [24:0] counter_1, counter_2
@@ -184,9 +186,9 @@ module control(
             S_WAIT_1   								= 5'd10,
 				S_CHECK_BALL_TOUCHING_1				= 5'd11,
 				S_CHECK_BALL_TOUCHING_2				= 5'd12,
-        		        S_BOUNCE_BALL							= 5'd13,
+        		S_BOUNCE_BALL							= 5'd13,
 				S_MOVE_BALL								= 5'd14,
-				S_MOVE_PADDLE							= 5'd15;
+				S_MOVE_PADDLE							= 5'd15,
 				S_GAME_OVER                      = 5'd16;
     
     // Next state logic aka our state table
@@ -233,12 +235,12 @@ module control(
             next_state <= S_START_DRAW_BACKGROUND;
         else if (current_state == S_CHECK_BALL_TOUCHING_1)
             next_state <= S_CHECK_BALL_TOUCHING_2;
+		  else if (current_state == S_CHECK_BALL_TOUCHING_2 && ball_hitting_floor)
+				next_state <= S_GAME_OVER;
         else if(current_state == S_CHECK_BALL_TOUCHING_2 && ball_touching_wall)
             next_state <= S_BOUNCE_BALL;
         else if(current_state == S_CHECK_BALL_TOUCHING_2 && !ball_touching_wall)
             next_state <= S_MOVE_BALL;
-	else if (current_state == S_MOVE_BALL && ball_hitting_floor)
-		 next_state <= S_GAME_OVER;
         else if(current_state == S_BOUNCE_BALL)
             next_state <= S_MOVE_BALL;
         else if(current_state == S_MOVE_BALL)
@@ -380,7 +382,7 @@ module datapath(
 	output reg [7:0] ball_x, 
 	output reg [6:0] ball_y, 
 	output reg [7:0] paddle_x,
-	output reg ball_touching_wall,
+	output reg ball_touching_wall, ball_hitting_floor,
     output reg writeEn,
 	output reg [7:0] draw_x,
 	output reg [6:0] draw_y,
@@ -567,7 +569,7 @@ module datapath(
 			// Logic for moving the ball based on left_key and right_key
 				if (left_key == 1'b1 && paddle_x > 8'd1)
 					 paddle_x <= paddle_x - 1'b1;
-				else if (right_key == 1'b1 && paddle_x <= SCREEN_WIDTH - PADDLE_WIDTH - 1)
+				else if (right_key == 1'b1 && paddle_x <= SCREEN_WIDTH - PADDLE_WIDTH - 2)
 					 paddle_x <= paddle_x + 1'b1;
         end
     end
@@ -575,8 +577,7 @@ module datapath(
     // Determining if the ball is touching the wall or paddle logic
     always @ (posedge clk) begin         //<- Logic for determining if the ball is touching the paddle
         if (!resetn) begin
-            ball_touching_wall <= 1'b0; 
-	    ball_hitting_floor <= 1'b0;
+            ball_touching_wall <= 1'b0;
         end
 		else if (check_ball_touching) begin
 			if (ball_x <= 8'b1)  //we are having cases just so the code is more readable
@@ -588,20 +589,24 @@ module datapath(
 			else if (ball_y == SCREEN_HEIGHT - 3'b111 && ball_direction == 2'b01) begin
 				  if (paddle_x - 3'b100 <= ball_x && ball_x <= paddle_x + PADDLE_WIDTH - 2'b10)
 						ball_touching_wall <= 1'b1;
-				else
-					ball_hitting_floor <= 1'b1;
 			end
 			else if (ball_y == SCREEN_HEIGHT - 3'b111 && ball_direction == 2'b10) begin
 				  if (paddle_x - 2'b10 <= ball_x && ball_x <= paddle_x + PADDLE_WIDTH)
 						ball_touching_wall <= 1'b1;
-				else 
-					ball_hitting_floor <= 1'b1;
 			end
 			else begin
 				ball_touching_wall <= 1'b0;
-			        ball_hitting_floor <= 1'b0;
 		         end
 		end
+    end
+    // Determining if the ball is touching the wall or paddle logic
+    always @ (posedge clk) begin         //<- Logic for determining if the ball is touching the paddle
+        if (!resetn)
+				ball_hitting_floor <= 1'b0;
+			else if (ball_y >= SCREEN_HEIGHT - 3'b101)
+					ball_hitting_floor <= 1'b1;
+			else 
+			    ball_hitting_floor <= 1'b0;
     end
     
 endmodule
