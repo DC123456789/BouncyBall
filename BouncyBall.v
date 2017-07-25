@@ -427,13 +427,13 @@ module datapath(
         if (draw_background) begin
             writeEn <= 1'b1; 
             draw_x <= counter_1;
-				draw_y <= counter_2;
-				if (counter_2 == SCREEN_HEIGHT - 1'b1)
-					colour <= 3'b100;
-				else if (counter_1 == 1'b0 || counter_1 == SCREEN_WIDTH - 1'b1 || counter_2 == 1'b0)
-					colour <= 3'b010;
-				else
-					colour <= 3'b000;
+			draw_y <= counter_2;
+			if (counter_2 == (SCREEN_HEIGHT - 1'b1))
+				colour <= 3'b100;
+			else if (counter_1 == 1'b0 || counter_1 == (SCREEN_WIDTH - 1'b1) || counter_2 == 1'b0)
+				colour <= 3'b010;
+			else
+				colour <= 3'b000;
         end
         else if (draw_ball) begin
 			writeEn <= 1'b1;
@@ -506,39 +506,39 @@ module datapath(
 			ball_direction <= 2'd0;
         end
         else if (bounce_ball) begin
-				if (ball_x <= 8'b1 && ball_y <= 7'b1)
-				 	 ball_direction <= 2'b01;
-				else if (ball_x >= SCREEN_WIDTH - 3'b101 && ball_y <= 7'b1)
+			if (ball_x <= 8'b1 && ball_y <= 7'b1)
+				 ball_direction <= 2'b01;
+			else if (ball_x >= SCREEN_WIDTH - 3'b101 && ball_y <= 7'b1)
+				 ball_direction <= 2'b10;
+			else if (ball_x <= 8'b1 && ball_y >= SCREEN_HEIGHT - 3'b111)
+				 ball_direction <= 2'b00;
+			else if (ball_x >= SCREEN_WIDTH - 3'b101 && ball_y >= SCREEN_HEIGHT - 3'b111)
+				 ball_direction <= 2'b11;
+			else if (ball_x <= 8'b1)begin
+				if (ball_direction == 2'b11)
+					ball_direction <= 2'b00;
+				else if (ball_direction == 2'b10)
+					ball_direction <= 2'b01;
+				end
+			else if (ball_y <= 8'b1)begin
+				if (ball_direction == 2'b00)
+					ball_direction <= 2'b01;
+				else if (ball_direction == 2'b11)
+					ball_direction <= 2'b10;
+				end
+			else if (ball_x >= SCREEN_WIDTH - 3'b101)begin
+				 if (ball_direction == 2'b01)
 					 ball_direction <= 2'b10;
-				else if (ball_x <= 8'b1 && ball_y >= SCREEN_HEIGHT - 3'b111)
-					 ball_direction <= 2'b00;
-				else if (ball_x >= SCREEN_WIDTH - 3'b101 && ball_y >= SCREEN_HEIGHT - 3'b111)
+				 else if (ball_direction == 2'b00)
 					 ball_direction <= 2'b11;
-				else if (ball_x <= 8'b1)begin
-					 if (ball_direction == 2'b11)
-					 	 ball_direction <= 2'b00;
-					 else if (ball_direction == 2'b10)
-						 ball_direction <= 2'b01;
-					 end
-				else if (ball_y <= 8'b1)begin
-					 if (ball_direction == 2'b00)
-					 	 ball_direction <= 2'b01;
-					 else if (ball_direction == 2'b11)
-						 ball_direction <= 2'b10;
-					 end
-				else if (ball_x >= SCREEN_WIDTH - 3'b101)begin
-					 if (ball_direction == 2'b01)
-						 ball_direction <= 2'b10;
-					 else if (ball_direction == 2'b00)
-						 ball_direction <= 2'b11;
-					 end
-				else if (ball_y >= SCREEN_HEIGHT - 3'b111)begin
-					 if (ball_direction == 2'b10)
-						 ball_direction <= 2'b11;
-					 else if (ball_direction == 2'b01)
-						 ball_direction <= 2'b00;
-					 end
+				 end
+			else if (ball_y >= SCREEN_HEIGHT - 3'b111)begin
+				if (ball_direction == 2'b10)
+					ball_direction <= 2'b11;
+				else if (ball_direction == 2'b01)
+					ball_direction <= 2'b00;
 			end
+		end
         else if (move_ball) begin
 			// Logic for moving the ball based on ball_direction
 				if (ball_direction == 2'b00)begin
@@ -567,10 +567,10 @@ module datapath(
         end
         else if (move_paddle) begin
 			// Logic for moving the ball based on left_key and right_key
-				if (left_key == 1'b1 && paddle_x > 8'd1)
-					 paddle_x <= paddle_x - 1'b1;
-				else if (right_key == 1'b1 && paddle_x <= SCREEN_WIDTH - PADDLE_WIDTH - 2)
-					 paddle_x <= paddle_x + 1'b1;
+			if (left_key == 1'b1 && paddle_x > 8'd1)
+				paddle_x <= paddle_x - 1'b1;
+			else if (right_key == 1'b1 && paddle_x < SCREEN_WIDTH - PADDLE_WIDTH - 2)
+				paddle_x <= paddle_x + 1'b1;
         end
     end
 	
@@ -581,32 +581,32 @@ module datapath(
         end
 		else if (check_ball_touching) begin
 			if (ball_x <= 8'b1)  //we are having cases just so the code is more readable
-					ball_touching_wall <= 1'b1;
+				ball_touching_wall <= 1'b1;
 			else if (ball_y <= 7'b1)
-					ball_touching_wall <= 1'b1;
+				ball_touching_wall <= 1'b1;
 			else if (ball_x >= SCREEN_WIDTH - 3'b101)
-				   ball_touching_wall <= 1'b1;
+				ball_touching_wall <= 1'b1;
 			else if (ball_y == SCREEN_HEIGHT - 3'b111 && ball_direction == 2'b01) begin
-				  if (paddle_x - 3'b100 <= ball_x && ball_x <= paddle_x + PADDLE_WIDTH - 2'b10)
-						ball_touching_wall <= 1'b1;
+				if (paddle_x - 3'b100 <= ball_x && ball_x <= paddle_x + PADDLE_WIDTH - 2'b10)
+					ball_touching_wall <= 1'b1;
 			end
 			else if (ball_y == SCREEN_HEIGHT - 3'b111 && ball_direction == 2'b10) begin
-				  if (paddle_x - 2'b10 <= ball_x && ball_x <= paddle_x + PADDLE_WIDTH)
-						ball_touching_wall <= 1'b1;
+				if (paddle_x - 2'b10 <= ball_x && ball_x <= paddle_x + PADDLE_WIDTH)
+					ball_touching_wall <= 1'b1;
 			end
 			else begin
 				ball_touching_wall <= 1'b0;
-		         end
+			end
 		end
     end
     // Determining if the ball is touching the wall or paddle logic
     always @ (posedge clk) begin         //<- Logic for determining if the ball is touching the paddle
         if (!resetn)
-				ball_hitting_floor <= 1'b0;
-			else if (ball_y >= SCREEN_HEIGHT - 3'b101)
-					ball_hitting_floor <= 1'b1;
-			else 
-			    ball_hitting_floor <= 1'b0;
+			ball_hitting_floor <= 1'b0;
+		else if (ball_y >= SCREEN_HEIGHT - 3'b101)
+				ball_hitting_floor <= 1'b1;
+		else 
+			ball_hitting_floor <= 1'b0;
     end
     
 endmodule
