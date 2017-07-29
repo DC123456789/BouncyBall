@@ -90,7 +90,7 @@ module BouncyBall
         .draw_paddle(draw_paddle), 
 		.check_ball_touching(check_ball_touching),
         .move_ball(move_ball), 
-		  .move_paddle(move_paddle),
+		.move_paddle(move_paddle),
         .bounce_ball(bounce_ball),
         .reset_ball(reset_ball),
 		.reset_paddle(reset_paddle),
@@ -159,7 +159,7 @@ module control(
     );
 
     reg [4:0] current_state, next_state;
-	reg incCounter_1, incCounter_2, incCounter_3, reset_counter_1, reset_counter_2, reset_counter_3;
+	reg incCounter_1, incCounter_2, incCounter_3, reset_counter_1, reset_counter_2, reset_counter_3, wait_for_start, check_for_start, start_game;
 	reg [10:0] counter_3;
 	
 	localparam	//SCREEN_WIDTH			= 8'd8,				// For ModelSim Testing purposes
@@ -173,23 +173,26 @@ module control(
 				//WAIT_CYCLES				= 5'b5;		// For ModelSim Testing purposes
 				WAIT_CYCLES				= 24'd1562500;		// ~32 cycles per second
     
-    localparam  S_INITIALIZE  					= 5'd0,
-				S_START_DRAW_BACKGROUND				= 5'd1,
-				S_DRAW_BACKGROUND_ROW				= 5'd2,
-				S_DRAW_BACKGROUND_NEXT_ROW			= 5'd3,
-				S_START_DRAW_BALL			   		= 5'd4,
-				S_DRAW_BALL	  							= 5'd5,
-				S_START_DRAW_PADDLE					= 5'd6,
-				S_DRAW_PADDLE_ROW						= 5'd7,
-				S_DRAW_PADDLE_NEXT_ROW				= 5'd8,
-            S_START_WAIT_1 						= 5'd9,
-            S_WAIT_1   								= 5'd10,
-				S_CHECK_BALL_TOUCHING_1				= 5'd11,
-				S_CHECK_BALL_TOUCHING_2				= 5'd12,
-        		S_BOUNCE_BALL							= 5'd13,
-				S_MOVE_BALL								= 5'd14,
-				S_MOVE_PADDLE							= 5'd15,
-				S_GAME_OVER                      = 5'd16;
+    localparam  S_INITIALIZE  						= 5'd0,
+				S_START_WAIT_0 						= 5'd1,
+				S_WAIT_0   							= 5'd2,
+				S_START_DRAW_BACKGROUND				= 5'd3,
+				S_DRAW_BACKGROUND_ROW				= 5'd4,
+				S_DRAW_BACKGROUND_NEXT_ROW			= 5'd5,
+				S_START_DRAW_BALL			   		= 5'd6,
+				S_DRAW_BALL	  						= 5'd7,
+				S_START_DRAW_PADDLE					= 5'd8,
+				S_DRAW_PADDLE_ROW					= 5'd9,
+				S_DRAW_PADDLE_NEXT_ROW				= 5'd10,
+				S_START_WAIT_1 						= 5'd11,
+				S_WAIT_1   							= 5'd12,
+				S_CHECK_BALL_TOUCHING_1				= 5'd13,
+				S_CHECK_BALL_TOUCHING_2				= 5'd14,
+        		S_BOUNCE_BALL						= 5'd15,
+        		S_INCREMENT_SCORE					= 5'd16,
+				S_MOVE_BALL							= 5'd17,
+				S_MOVE_PADDLE						= 5'd18,
+				S_GAME_OVER                     	= 5'd19;
     
     // Next state logic aka our state table
 	// Current model: Intialize -> Draw Screen -> Wait -> Move Objects -> Draw Screen - > Wait -> etc.
@@ -197,6 +200,10 @@ module control(
     begin: state_FFs 
         if (current_state == S_INITIALIZE)
             next_state <= S_START_DRAW_BACKGROUND;
+		else if (current_state == S_WAIT_0 && !start_game)
+            next_state <= S_WAIT_0;
+		else if (current_state == S_WAIT_0 && start_game)
+            next_state <= S_START_WAIT_1;
         else if (current_state == S_START_DRAW_BACKGROUND)
             next_state <= S_DRAW_BACKGROUND_ROW;			
         else if(current_state == S_DRAW_BACKGROUND_ROW && counter_1 < SCREEN_WIDTH - 1)
@@ -221,8 +228,12 @@ module control(
             next_state <= S_DRAW_PADDLE_NEXT_ROW;
         else if(current_state == S_DRAW_PADDLE_NEXT_ROW && counter_2 < PADDLE_HEIGHT - 1)
             next_state <= S_DRAW_PADDLE_ROW;
-        else if(current_state == S_DRAW_PADDLE_NEXT_ROW && counter_2 >= PADDLE_HEIGHT - 1)
-            next_state <= S_START_WAIT_1;
+        else if(current_state == S_DRAW_PADDLE_NEXT_ROW && counter_2 >= PADDLE_HEIGHT - 1) begin
+			if (start_game)
+				next_state <= S_START_WAIT_1;
+			else
+				next_state <= S_WAIT_0;
+		end
         else if (current_state == S_START_WAIT_1)
             next_state <= S_WAIT_1;
         else if(current_state == S_WAIT_1 && counter_1 < WAIT_CYCLES - 1)
@@ -256,6 +267,8 @@ module control(
     always @(*)
     begin: enable_signals
         // By default make all our signals 0
+		wait_for_start = 1'b0;
+		check_for_start = 1'b0;
 		draw_background = 1'b0;
 		draw_ball = 1'b0;
 		draw_paddle = 1'b0;
@@ -274,11 +287,15 @@ module control(
 
         case (current_state)
             S_INITIALIZE: begin
+				wait_for_start = 1'b1; 
 				reset_ball = 1'b1; 
 				reset_paddle = 1'b1;
 				reset_counter_1 = 1'b1;
 				reset_counter_2 = 1'b1;
 				reset_counter_3 = 1'b1;
+            end
+            S_WAIT_0: begin
+				check_for_start = 1'b1;
             end
             S_START_DRAW_BACKGROUND: begin
 				reset_counter_1 = 1'b1;
@@ -368,6 +385,15 @@ module control(
             counter_3 <= 10'b0;
         else if(incCounter_3)
             counter_3 <= counter_3 + 1'b1;
+    end
+	
+    // handle starting
+    always@(posedge clk)
+    begin: start_FFs
+        if(!resetn || wait_for_start)
+            start_game <= 1'b0;
+        else if(go && check_for_start)
+            start_game <= 1'b1;
     end
 endmodule
 

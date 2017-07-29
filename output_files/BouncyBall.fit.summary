@@ -1,12 +1,12 @@
-Fitter Status : Successful - Sun Jul 23 16:15:33 2017
+Fitter Status : Successful - Sat Jul 29 00:02:21 2017
 Quartus Prime Version : 16.0.0 Build 211 04/27/2016 SJ Lite Edition
 Revision Name : BouncyBall
 Top-level Entity Name : BouncyBall
 Family : Cyclone V
 Device : 5CSEMA5F31C6
 Timing Models : Final
-Logic utilization (in ALMs) : 94 / 32,070 ( < 1 % )
-Total registers : 91
+Logic utilization (in ALMs) : 243 / 32,070 ( < 1 % )
+Total registers : 157
 Total pins : 50 / 457 ( 11 % )
 Total virtual pins : 0
 Total block memory bits : 57,600 / 4,065,280 ( 1 % )
