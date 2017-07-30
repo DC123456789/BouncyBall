@@ -593,13 +593,13 @@ module datapath(
 			ball_direction <= counter_4[1:0];
         end
         else if (bounce_ball) begin
-			if (ball_x <= 8'b1 && ball_y <= 7'b1)
+			if (ball_x <= 8'b1 && ball_y <= 7'b1) //if hit top left corner
 				 ball_direction <= 2'b01;
-			else if (ball_x >= SCREEN_WIDTH - 3'b101 && ball_y <= 7'b1)
+			else if (ball_x >= SCREEN_WIDTH - 3'b101 && ball_y <= 7'b1) //if hit top right corner
 				 ball_direction <= 2'b10;
-			else if (ball_x <= 8'b1 && ball_y >= SCREEN_HEIGHT - 3'b111)
+			else if (ball_x <= 8'b1 && ball_y >= SCREEN_HEIGHT - 3'b111) //if hit bottom left corner
 				 ball_direction <= 2'b00;
-			else if (ball_x >= SCREEN_WIDTH - 3'b101 && ball_y >= SCREEN_HEIGHT - 3'b111)
+			else if (ball_x >= SCREEN_WIDTH - 3'b101 && ball_y >= SCREEN_HEIGHT - 3'b111) //if hit bottom right corner
 				 ball_direction <= 2'b11;
 			else if (ball_x <= 8'b1)begin
 				if (ball_direction == 2'b11)
@@ -669,16 +669,30 @@ module datapath(
         end
 		else if (check_ball_touching) begin
 			if (ball_y == SCREEN_HEIGHT - 3'b111 && ball_direction == 2'b01) begin
-				if (paddle_x - 3'b100 <= ball_x && ball_x <= paddle_x + PADDLE_WIDTH - 2'b10)
+				if (paddle_x <= 8'b1)begin
+					if (paddle_x <= ball_x && ball_x <= paddle_x + PADDLE_WIDTH - 2'b10)
 					ball_touching_paddle <= 1'b1;
 					ball_touching_wall <= 1'b1;
-			end
-			else if (ball_y == SCREEN_HEIGHT - 3'b111 && ball_direction == 2'b10) begin
-				if (paddle_x - 2'b10 <= ball_x && ball_x <= paddle_x + PADDLE_WIDTH)
+			        end
+				else if (paddle_x - 3'b100 <= ball_x && ball_x <= paddle_x + PADDLE_WIDTH - 2'b10)begin
 					ball_touching_paddle <= 1'b1;
 					ball_touching_wall <= 1'b1;
+				end
 			end
-			else if (ball_x <= 8'b1) begin //we are having cases just so the code is more readable
+			else if (ball_y == SCREEN_HEIGHT - 3'b111 && ball_direction == 2'b10) begin 
+				if (paddle_x <= 8'b1)begin
+					if (paddle_x <= ball_x && ball_x <= paddle_x + PADDLE_WIDTH)begin
+						ball_touching_paddle <= 1'b1;
+						ball_touching_wall <= 1'b1;
+						end
+					end
+				else if (paddle_x - 2'b10 <= ball_x && ball_x <= paddle_x + PADDLE_WIDTH)begin
+					ball_touching_paddle <= 1'b1;
+					ball_touching_wall <= 1'b1;
+				end
+			end
+			
+			else if (ball_x <= 8'b1) begin
 				ball_touching_wall <= 1'b1;
 				ball_touching_paddle <= 1'b0;
 			end 
