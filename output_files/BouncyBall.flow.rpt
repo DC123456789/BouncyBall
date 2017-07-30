@@ -1,5 +1,5 @@
 Flow report for BouncyBall
-Sat Jul 29 00:03:00 2017
+Sat Jul 29 23:55:13 2017
 Quartus Prime Version 16.0.0 Build 211 04/27/2016 SJ Lite Edition
 
 
@@ -41,16 +41,16 @@ agreement for further details.
 +-------------------------------------------------------------------------------+
 ; Flow Summary                                                                  ;
 +---------------------------------+---------------------------------------------+
-; Flow Status                     ; Successful - Sat Jul 29 00:03:00 2017       ;
+; Flow Status                     ; Successful - Sat Jul 29 23:55:13 2017       ;
 ; Quartus Prime Version           ; 16.0.0 Build 211 04/27/2016 SJ Lite Edition ;
 ; Revision Name                   ; BouncyBall                                  ;
 ; Top-level Entity Name           ; BouncyBall                                  ;
 ; Family                          ; Cyclone V                                   ;
 ; Device                          ; 5CSEMA5F31C6                                ;
 ; Timing Models                   ; Final                                       ;
-; Logic utilization (in ALMs)     ; 243 / 32,070 ( < 1 % )                      ;
-; Total registers                 ; 157                                         ;
-; Total pins                      ; 50 / 457 ( 11 % )                           ;
+; Logic utilization (in ALMs)     ; 285 / 32,070 ( < 1 % )                      ;
+; Total registers                 ; 180                                         ;
+; Total pins                      ; 71 / 457 ( 16 % )                           ;
 ; Total virtual pins              ; 0                                           ;
 ; Total block memory bits         ; 57,600 / 4,065,280 ( 1 % )                  ;
 ; Total DSP Blocks                ; 0 / 87 ( 0 % )                              ;
@@ -68,7 +68,7 @@ agreement for further details.
 +-------------------+---------------------+
 ; Option            ; Setting             ;
 +-------------------+---------------------+
-; Start date & time ; 07/29/2017 00:01:04 ;
+; Start date & time ; 07/29/2017 23:53:24 ;
 ; Main task         ; Compilation         ;
 ; Revision Name     ; BouncyBall          ;
 +-------------------+---------------------+
@@ -79,7 +79,7 @@ agreement for further details.
 +-------------------------------------+---------------------------------+---------------+-------------+----------------+
 ; Assignment Name                     ; Value                           ; Default Value ; Entity Name ; Section Id     ;
 +-------------------------------------+---------------------------------+---------------+-------------+----------------+
-; COMPILER_SIGNATURE_ID               ; 128528033219155.150130086419712 ; --            ; --          ; --             ;
+; COMPILER_SIGNATURE_ID               ; 128528033219155.150138680411076 ; --            ; --          ; --             ;
 ; EDA_OUTPUT_DATA_FORMAT              ; Verilog Hdl                     ; --            ; --          ; eda_simulation ;
 ; EDA_SIMULATION_TOOL                 ; ModelSim-Altera (Verilog)       ; <None>        ; --          ; --             ;
 ; EDA_TIME_SCALE                      ; 1 ps                            ; --            ; --          ; eda_simulation ;
@@ -97,12 +97,12 @@ agreement for further details.
 +---------------------------+--------------+-------------------------+---------------------+------------------------------------+
 ; Module Name               ; Elapsed Time ; Average Processors Used ; Peak Virtual Memory ; Total CPU Time (on all processors) ;
 +---------------------------+--------------+-------------------------+---------------------+------------------------------------+
-; Analysis & Synthesis      ; 00:00:18     ; 1.0                     ; 944 MB              ; 00:00:27                           ;
-; Fitter                    ; 00:00:56     ; 1.0                     ; 2775 MB             ; 00:01:15                           ;
-; Assembler                 ; 00:00:18     ; 1.0                     ; 929 MB              ; 00:00:08                           ;
-; TimeQuest Timing Analyzer ; 00:00:10     ; 1.1                     ; 1306 MB             ; 00:00:08                           ;
-; EDA Netlist Writer        ; 00:00:03     ; 1.0                     ; 948 MB              ; 00:00:02                           ;
-; Total                     ; 00:01:45     ; --                      ; --                  ; 00:02:00                           ;
+; Analysis & Synthesis      ; 00:00:18     ; 1.0                     ; 942 MB              ; 00:00:27                           ;
+; Fitter                    ; 00:00:57     ; 1.0                     ; 2781 MB             ; 00:01:20                           ;
+; Assembler                 ; 00:00:13     ; 1.0                     ; 928 MB              ; 00:00:08                           ;
+; TimeQuest Timing Analyzer ; 00:00:10     ; 1.2                     ; 1306 MB             ; 00:00:09                           ;
+; EDA Netlist Writer        ; 00:00:02     ; 1.0                     ; 950 MB              ; 00:00:02                           ;
+; Total                     ; 00:01:40     ; --                      ; --                  ; 00:02:06                           ;
 +---------------------------+--------------+-------------------------+---------------------+------------------------------------+
 
 
