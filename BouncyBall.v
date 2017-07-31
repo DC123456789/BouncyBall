@@ -75,7 +75,7 @@ module BouncyBall
 	// for the VGA controller, in addition to any other functionality your design may require.
     
     // lots of wires to connect our datapath and control
-    wire draw_background, draw_ball, draw_paddle, check_ball_touching, move_objects, bounce_ball, reset_ball, reset_paddle, left_key, right_key, go_key; 
+    wire draw_background, draw_ball, draw_paddle, check_ball_touching, move_objects, bounce_ball, reset_ball, reset_paddle, left_key, right_key, go_key, game_over; 
 	wire ball_touching_wall, ball_touching_paddle, ball_hitting_floor;
 	wire [7:0] ball_x, paddle_x;
 	wire [6:0] ball_y;
@@ -107,6 +107,7 @@ module BouncyBall
         .counter_1(counter_1),
         .counter_2(counter_2),
 		.counter_4(counter_4),
+		.game_over(game_over),
 
         .left_key(left_key),
         .right_key(right_key),
@@ -151,7 +152,8 @@ module BouncyBall
         .counter_1(counter_1),
         .counter_2(counter_2),
 		.counter_4(counter_4),
-		.score(score)
+		.score(score),
+		.game_over(game_over)
     );
 
     // Display score
@@ -175,11 +177,13 @@ module control(
     output reg draw_background, draw_ball, draw_paddle, check_ball_touching, move_ball, move_paddle, bounce_ball, reset_ball, reset_paddle,
 	output reg [24:0] counter_1, counter_2,
 	output reg [5:0] counter_4,
-	output reg [10:0] score
+	output reg [10:0] score,
+	output reg game_over
     );
 
     reg [4:0] current_state, next_state;
-	reg incCounter_1, incCounter_2, incCounter_3, reset_counter_1, reset_counter_2, reset_counter_3, wait_for_start, check_for_start, start_game, reset_score, inc_score, inc_level;
+	reg incCounter_1, incCounter_2, incCounter_3, reset_counter_1, reset_counter_2, reset_counter_3, wait_for_start, check_for_start, start_game, reset_score, inc_score;
+	reg inc_level, begin_game, set_game_over;
 	reg [10:0] counter_3;
 	reg [23:0] wait_cycles;
 	
@@ -213,7 +217,9 @@ module control(
         		S_INCREMENT_SCORE					= 5'd16,
 				S_MOVE_BALL							= 5'd17,
 				S_MOVE_PADDLE						= 5'd18,
-				S_GAME_OVER                     	= 5'd19;
+				S_GAME_OVER                     	= 5'd19,
+				S_START_WAIT_2 						= 5'd20,
+				S_WAIT_2  							= 5'd21;
     
     // Next state logic aka our state table
 	// Current model: Intialize -> Draw Screen -> Wait -> Move Objects -> Draw Screen - > Wait -> etc.
@@ -250,7 +256,9 @@ module control(
         else if(current_state == S_DRAW_PADDLE_NEXT_ROW && counter_2 < PADDLE_HEIGHT - 1)
             next_state <= S_DRAW_PADDLE_ROW;
         else if(current_state == S_DRAW_PADDLE_NEXT_ROW && counter_2 >= PADDLE_HEIGHT - 1) begin
-			if (start_game)
+			if (game_over)
+				next_state <= S_START_WAIT_2;
+			else if (start_game)
 				next_state <= S_START_WAIT_1;
 			else
 				next_state <= S_WAIT_0;
@@ -282,7 +290,13 @@ module control(
         else if(current_state == S_MOVE_BALL)
             next_state <= S_START_DRAW_BACKGROUND;
 	    else if (current_state == S_GAME_OVER)
-		    next_state <= S_INITIALIZE;
+		    next_state <= S_START_DRAW_BACKGROUND;
+        else if (current_state == S_START_WAIT_2)
+            next_state <= S_WAIT_2;
+		else if (current_state == S_WAIT_2 && !start_game)
+            next_state <= S_WAIT_2;
+		else if (current_state == S_WAIT_2 && start_game)
+            next_state <= S_INITIALIZE;
         else
             next_state <= S_INITIALIZE;
     end // state_FFs
@@ -312,6 +326,8 @@ module control(
 		reset_score = 1'b0;
 		inc_score = 1'b0;
 		inc_level = 1'b0;
+		begin_game = 1'b0;
+		set_game_over = 1'b0;
 
         case (current_state)
             S_INITIALIZE: begin
@@ -322,6 +338,7 @@ module control(
 				reset_counter_2 = 1'b1;
 				reset_counter_3 = 1'b1;
 				reset_score = 1'b1;
+				begin_game = 1'b1;
             end
             S_WAIT_0: begin
 				check_for_start = 1'b1;
@@ -379,7 +396,10 @@ module control(
 			S_MOVE_PADDLE: begin
 				move_paddle = 1'b1;
 				incCounter_3 = 1'b1;
-			end			
+			end		
+			S_GAME_OVER: begin
+				set_game_over = 1'b1;
+			end
         // default:    // don't need default since we already made sure all of our outputs were assigned a value at the start of the always block
         endcase
     end // enable_signals
@@ -447,13 +467,22 @@ module control(
             start_game <= 1'b1;
     end
 	
+    // handle game over
+    always@(posedge clk)
+    begin: game_over_FFs
+        if(!resetn || begin_game)
+            game_over <= 1'b0;
+        else if(set_game_over)
+            game_over <= 1'b1;
+    end
+	
     // handle wait cycles
     always@(posedge clk)
     begin: wait_cycles_FFs
         if(!resetn)
             wait_cycles <= STARTING_WAIT_CYCLES;
         else if(inc_level && score[2:0] == 3'b111)
-            wait_cycles <= (wait_cycles * 3) << 2;		// Multiplied by 3/4 every 8 bounces off the paddle
+            wait_cycles <= ((wait_cycles * 3) << 2);		// Multiplied by 3/4 every 8 bounces off the paddle
     end
 endmodule
 
@@ -463,6 +492,7 @@ module datapath(
     input draw_background, draw_ball, draw_paddle, check_ball_touching, move_ball, move_paddle, bounce_ball, reset_ball, reset_paddle,
 	input [24:0] counter_1, counter_2,
 	input [5:0] counter_4,
+	input game_over,
 
     input left_key, right_key,
 	
@@ -524,10 +554,13 @@ module datapath(
         end
         else if (draw_ball) begin
 			writeEn <= 1'b1;
+			if (game_over)
+				colour <= 3'b100;
+			else
+				colour <= 3'b111;
 			begin: set_pixel_location
 				draw_x <= ball_x;
 				draw_y <= ball_y;
-				colour <= 3'b111;
 				case (counter_1)
 					draw1_0: begin
 						draw_x <= ball_x + 1'b1;
