@@ -601,6 +601,10 @@ module datapath(
 				 ball_direction <= 2'b00;
 			else if (ball_x >= SCREEN_WIDTH - 3'b101 && ball_y >= SCREEN_HEIGHT - 3'b111) //if hit bottom right corner
 				 ball_direction <= 2'b11;
+		   	else if (paddle_x >= 2'b11 && ball_x == paddle_x - 2'b11 && ball_y == SCREEN_HEIGHT - 4'b110 && ball_direction == 2'b01) //if ball hits paddle's left corner
+				 ball_direction <= 2'b11;
+			else if (ball_x == paddle_x + 5'd17 && ball_y == SCREEN_HEIGHT - 4'b110 && ball_direction == 2'b10) //if ball hits paddle's right corner
+				 ball_direction <= 2'b00;
 			else if (ball_x <= 8'b1)begin
 				if (ball_direction == 2'b11)
 					ball_direction <= 2'b00;
