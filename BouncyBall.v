@@ -21,9 +21,9 @@ module BouncyBall
 	input			CLOCK_50;				//	50 MHz
 	input   [9:0]   SW;
 	input   [3:0]   KEY;
-	input   [6:0]   HEX0;
-	input   [6:0]   HEX1;
-	input   [6:0]   HEX2;
+	output   [6:0]   HEX0;
+	output   [6:0]   HEX1;
+	output   [6:0]   HEX2;
 
 	// Declare your inputs and outputs here
 	// Do not change the following outputs
@@ -48,34 +48,34 @@ module BouncyBall
 	// Create an Instance of a VGA controller - there can be only one!
 	// Define the number of colours as well as the initial background
 	// image file (.MIF) for the controller.
-	// vga_adapter VGA(
-		// .resetn(resetn),
-		// .clock(CLOCK_50),
-		// .colour(colour),
-		// .x(x),
-		// .y(y),
-		// .plot(writeEn),
-		// /* Signals for the DAC to drive the monitor. */
-		// .VGA_R(VGA_R),
-		// .VGA_G(VGA_G),
-		// .VGA_B(VGA_B),
-		// .VGA_HS(VGA_HS),
-		// .VGA_VS(VGA_VS),
-		// .VGA_BLANK(VGA_BLANK_N),
-		// .VGA_SYNC(VGA_SYNC_N),
-		// .VGA_CLK(VGA_CLK)
-	// );
+	vga_adapter VGA(
+		.resetn(resetn),
+		.clock(CLOCK_50),
+		.colour(colour),
+		.x(x),
+		.y(y),
+		.plot(writeEn),
+		/* Signals for the DAC to drive the monitor. */
+		.VGA_R(VGA_R),
+		.VGA_G(VGA_G),
+		.VGA_B(VGA_B),
+		.VGA_HS(VGA_HS),
+		.VGA_VS(VGA_VS),
+		.VGA_BLANK(VGA_BLANK_N),
+		.VGA_SYNC(VGA_SYNC_N),
+		.VGA_CLK(VGA_CLK)
+	);
 	
-	// defparam VGA.RESOLUTION = "160x120";
-	// defparam VGA.MONOCHROME = "FALSE";
-	// defparam VGA.BITS_PER_COLOUR_CHANNEL = 1;
-	// defparam VGA.BACKGROUND_IMAGE = "black.mif";
+	defparam VGA.RESOLUTION = "160x120";
+	defparam VGA.MONOCHROME = "FALSE";
+	defparam VGA.BITS_PER_COLOUR_CHANNEL = 1;
+	defparam VGA.BACKGROUND_IMAGE = "black.mif";
 			
 	// Put your code here. Your code should produce signals x,y,colour and writeEn/plot
 	// for the VGA controller, in addition to any other functionality your design may require.
     
     // lots of wires to connect our datapath and control
-    wire draw_background, draw_ball, draw_paddle, check_ball_touching, move_objects, bounce_ball, reset_ball, reset_paddle, left_key, right_key, go_key; 
+    wire draw_background, draw_ball, draw_paddle, check_ball_touching, move_objects, bounce_ball, reset_ball, reset_paddle, left_key, right_key, go_key, game_over; 
 	wire ball_touching_wall, ball_touching_paddle, ball_hitting_floor;
 	wire [7:0] ball_x, paddle_x;
 	wire [6:0] ball_y;
@@ -107,6 +107,7 @@ module BouncyBall
         .counter_1(counter_1),
         .counter_2(counter_2),
 		.counter_4(counter_4),
+		.game_over(game_over),
 
         .left_key(left_key),
         .right_key(right_key),
@@ -151,7 +152,8 @@ module BouncyBall
         .counter_1(counter_1),
         .counter_2(counter_2),
 		.counter_4(counter_4),
-		.score(score)
+		.score(score),
+		.game_over(game_over)
     );
 
     // Display score
@@ -175,11 +177,13 @@ module control(
     output reg draw_background, draw_ball, draw_paddle, check_ball_touching, move_ball, move_paddle, bounce_ball, reset_ball, reset_paddle,
 	output reg [24:0] counter_1, counter_2,
 	output reg [5:0] counter_4,
-	output reg [10:0] score
+	output reg [10:0] score,
+	output reg game_over
     );
 
     reg [4:0] current_state, next_state;
-	reg incCounter_1, incCounter_2, incCounter_3, reset_counter_1, reset_counter_2, reset_counter_3, wait_for_start, check_for_start, start_game, reset_score, inc_score, inc_level;
+	reg incCounter_1, incCounter_2, incCounter_3, reset_counter_1, reset_counter_2, reset_counter_3, wait_for_start, check_for_start, start_game, reset_score, inc_score;
+	reg inc_level, begin_game, set_game_over, reset_wait_cycles;
 	reg [10:0] counter_3;
 	reg [23:0] wait_cycles;
 	
@@ -192,7 +196,7 @@ module control(
 				PADDLE_WIDTH			= 5'd18,
 				PADDLE_HEIGHT			= 2'd2,
 				//STARTING_WAIT_CYCLES	= 5'b5;		// For ModelSim Testing purposes
-				STARTING_WAIT_CYCLES	= 24'd1562500;		// ~32 cycles per second
+				STARTING_WAIT_CYCLES	= 24'd1250000;		// ~40 cycles per second
     
     localparam  S_INITIALIZE  						= 5'd0,
 				S_START_WAIT_0 						= 5'd1,
@@ -213,7 +217,9 @@ module control(
         		S_INCREMENT_SCORE					= 5'd16,
 				S_MOVE_BALL							= 5'd17,
 				S_MOVE_PADDLE						= 5'd18,
-				S_GAME_OVER                     	= 5'd19;
+				S_GAME_OVER                     	= 5'd19,
+				S_START_WAIT_2 						= 5'd20,
+				S_WAIT_2  							= 5'd21;
     
     // Next state logic aka our state table
 	// Current model: Intialize -> Draw Screen -> Wait -> Move Objects -> Draw Screen - > Wait -> etc.
@@ -233,7 +239,7 @@ module control(
             next_state <= S_DRAW_BACKGROUND_NEXT_ROW;
         else if(current_state == S_DRAW_BACKGROUND_NEXT_ROW && counter_2 < SCREEN_HEIGHT - 1)
             next_state <= S_DRAW_BACKGROUND_ROW;
-        else if(current_state == S_DRAW_BACKGROUND_NEXT_ROW && counter_2 >= SCREEN_HEIGHT - 1)
+        else if(current_state == S_DRAW_BACKGROUND_NEXT_ROW && counter_2 >= SCREEN_HEIGHT - 2'd2)
             next_state <= S_START_DRAW_BALL;
         else if (current_state == S_START_DRAW_BALL)
             next_state <= S_DRAW_BALL;		          
@@ -250,11 +256,13 @@ module control(
         else if(current_state == S_DRAW_PADDLE_NEXT_ROW && counter_2 < PADDLE_HEIGHT - 1)
             next_state <= S_DRAW_PADDLE_ROW;
         else if(current_state == S_DRAW_PADDLE_NEXT_ROW && counter_2 >= PADDLE_HEIGHT - 1) begin
-			if (start_game)
-				next_state <= S_START_WAIT_1;
-			else
-				next_state <= S_WAIT_0;
-		end
+				if (game_over)
+					next_state <= S_START_WAIT_2;
+				else if (start_game)
+					next_state <= S_START_WAIT_1;
+				else
+					next_state <= S_WAIT_0;
+			end
         else if (current_state == S_START_WAIT_1)
             next_state <= S_WAIT_1;
         else if(current_state == S_WAIT_1 && counter_1 < wait_cycles - 1)
@@ -282,7 +290,13 @@ module control(
         else if(current_state == S_MOVE_BALL)
             next_state <= S_START_DRAW_BACKGROUND;
 	    else if (current_state == S_GAME_OVER)
-		    next_state <= S_INITIALIZE;
+		    next_state <= S_START_DRAW_BACKGROUND;
+        else if (current_state == S_START_WAIT_2)
+            next_state <= S_WAIT_2;
+		else if (current_state == S_WAIT_2 && !start_game)
+            next_state <= S_WAIT_2;
+		else if (current_state == S_WAIT_2 && start_game)
+            next_state <= S_INITIALIZE;
         else
             next_state <= S_INITIALIZE;
     end // state_FFs
@@ -312,6 +326,9 @@ module control(
 		reset_score = 1'b0;
 		inc_score = 1'b0;
 		inc_level = 1'b0;
+		begin_game = 1'b0;
+		set_game_over = 1'b0;
+		reset_wait_cycles = 1'b0;
 
         case (current_state)
             S_INITIALIZE: begin
@@ -322,6 +339,8 @@ module control(
 				reset_counter_2 = 1'b1;
 				reset_counter_3 = 1'b1;
 				reset_score = 1'b1;
+				begin_game = 1'b1;
+				reset_wait_cycles = 1'b1;
             end
             S_WAIT_0: begin
 				check_for_start = 1'b1;
@@ -379,7 +398,16 @@ module control(
 			S_MOVE_PADDLE: begin
 				move_paddle = 1'b1;
 				incCounter_3 = 1'b1;
-			end			
+			end		
+			S_GAME_OVER: begin
+				set_game_over = 1'b1;
+			end
+			S_START_WAIT_2: begin
+				wait_for_start = 1'b1;
+			end
+            S_WAIT_2: begin
+				check_for_start = 1'b1;
+            end
         // default:    // don't need default since we already made sure all of our outputs were assigned a value at the start of the always block
         endcase
     end // enable_signals
@@ -447,13 +475,22 @@ module control(
             start_game <= 1'b1;
     end
 	
+    // handle game over
+    always@(posedge clk)
+    begin: game_over_FFs
+        if(!resetn || begin_game)
+            game_over <= 1'b0;
+        else if(set_game_over)
+            game_over <= 1'b1;
+    end
+	
     // handle wait cycles
     always@(posedge clk)
     begin: wait_cycles_FFs
-        if(!resetn)
+        if(!resetn || reset_wait_cycles)
             wait_cycles <= STARTING_WAIT_CYCLES;
         else if(inc_level && score[2:0] == 3'b111)
-            wait_cycles <= (wait_cycles * 3) << 2;		// Multiplied by 3/4 every 8 bounces off the paddle
+            wait_cycles <= ((wait_cycles * 3) >> 2);		// Multiplied by 3/4 every 8 bounces off the paddle
     end
 endmodule
 
@@ -463,6 +500,7 @@ module datapath(
     input draw_background, draw_ball, draw_paddle, check_ball_touching, move_ball, move_paddle, bounce_ball, reset_ball, reset_paddle,
 	input [24:0] counter_1, counter_2,
 	input [5:0] counter_4,
+	input game_over,
 
     input left_key, right_key,
 	
@@ -514,73 +552,76 @@ module datapath(
         if (draw_background) begin
             writeEn <= 1'b1; 
             draw_x <= counter_1;
-			draw_y <= counter_2;
-			if (counter_2 == (SCREEN_HEIGHT - 1'b1))
-				colour <= 3'b100;
-			else if (counter_1 == 1'b0 || counter_1 == (SCREEN_WIDTH - 1'b1) || counter_2 == 1'b0)
-				colour <= 3'b010;
-			else
-				colour <= 3'b000;
+				draw_y <= counter_2 + 1'b1;
+				if (counter_2 == (SCREEN_HEIGHT - 2'b10))
+					colour <= 3'b100;
+				else if (counter_1 == 1'b0 || counter_1 == (SCREEN_WIDTH - 1'b1) || counter_2 == 1'b0)
+					colour <= 3'b010;
+				else
+					colour <= 3'b000;
         end
         else if (draw_ball) begin
-			writeEn <= 1'b1;
-			begin: set_pixel_location
-				draw_x <= ball_x;
-				draw_y <= ball_y;
-				colour <= 3'b111;
-				case (counter_1)
-					draw1_0: begin
-						draw_x <= ball_x + 1'b1;
-					end
-					draw2_0: begin
-						draw_x <= ball_x + 2'b10;
-					end
-					draw0_1: begin
-						draw_y <= ball_y + 1'b1;
-					end
-					draw1_1: begin
-						draw_x <= ball_x + 1'b1;
-						draw_y <= ball_y + 1'b1;
-					end
-					draw2_1: begin
-						draw_x <= ball_x + 2'b10;
-						draw_y <= ball_y + 1'b1;
-					end
-					draw3_1: begin
-						draw_x <= ball_x + 2'b11;
-						draw_y <= ball_y + 1'b1;
-					end
-					draw0_2: begin
-						draw_x <= ball_x;
-						draw_y <= ball_y + 2'b10;
-					end
-					draw1_2: begin
-						draw_x <= ball_x + 1'b1;
-						draw_y <= ball_y + 2'b10;
-					end
-					draw2_2: begin
-						draw_x <= ball_x + 2'b10;
-						draw_y <= ball_y + 2'b10;
-					end
-					draw3_2: begin
-						draw_x <= ball_x + 2'b11;
-						draw_y <= ball_y + 2'b10;
-					end
-					draw1_3: begin
-						draw_x <= ball_x + 1'b1;
-						draw_y <= ball_y + 2'b11;
-					end
-					draw2_3: begin
-						draw_x <= ball_x + 2'b10;
-						draw_y <= ball_y + 2'b11;
-					end
-				endcase
+				writeEn <= 1'b1;
+				if (game_over)
+					colour <= 3'b100;
+				else
+					colour <= 3'b111;
+				begin: set_pixel_location
+					draw_x <= ball_x;
+					draw_y <= ball_y;
+					case (counter_1)
+						draw1_0: begin
+							draw_x <= ball_x + 1'b1;
+						end
+						draw2_0: begin
+							draw_x <= ball_x + 2'b10;
+						end
+						draw0_1: begin
+							draw_y <= ball_y + 1'b1;
+						end
+						draw1_1: begin
+							draw_x <= ball_x + 1'b1;
+							draw_y <= ball_y + 1'b1;
+						end
+						draw2_1: begin
+							draw_x <= ball_x + 2'b10;
+							draw_y <= ball_y + 1'b1;
+						end
+						draw3_1: begin
+							draw_x <= ball_x + 2'b11;
+							draw_y <= ball_y + 1'b1;
+						end
+						draw0_2: begin
+							draw_x <= ball_x;
+							draw_y <= ball_y + 2'b10;
+						end
+						draw1_2: begin
+							draw_x <= ball_x + 1'b1;
+							draw_y <= ball_y + 2'b10;
+						end
+						draw2_2: begin
+							draw_x <= ball_x + 2'b10;
+							draw_y <= ball_y + 2'b10;
+						end
+						draw3_2: begin
+							draw_x <= ball_x + 2'b11;
+							draw_y <= ball_y + 2'b10;
+						end
+						draw1_3: begin
+							draw_x <= ball_x + 1'b1;
+							draw_y <= ball_y + 2'b11;
+						end
+						draw2_3: begin
+							draw_x <= ball_x + 2'b10;
+							draw_y <= ball_y + 2'b11;
+						end
+					endcase
+				end
 			end
-		end
         else if (draw_paddle) begin
             writeEn <= 1'b1; 
             draw_x <= paddle_x + counter_1;
-			draw_y <= SCREEN_HEIGHT - counter_2 - 2;  
+			draw_y <= SCREEN_HEIGHT - counter_2 - 2'b10;  
 			colour <= 3'b011;	                       
         end
     end
@@ -593,21 +634,25 @@ module datapath(
 			ball_direction <= counter_4[1:0];
         end
         else if (bounce_ball) begin
-			if (ball_x <= 8'b1 && ball_y <= 7'b1) //if hit top left corner
+			if (ball_x <= 8'b1 && ball_y <= 7'b10) //if hit top left corner
 				 ball_direction <= 2'b01;
-			else if (ball_x >= SCREEN_WIDTH - 3'b101 && ball_y <= 7'b1) //if hit top right corner
+			else if (ball_x >= SCREEN_WIDTH - 3'b101 && ball_y <= 7'b10) //if hit top right corner
 				 ball_direction <= 2'b10;
 			else if (ball_x <= 8'b1 && ball_y >= SCREEN_HEIGHT - 3'b111) //if hit bottom left corner
 				 ball_direction <= 2'b00;
 			else if (ball_x >= SCREEN_WIDTH - 3'b101 && ball_y >= SCREEN_HEIGHT - 3'b111) //if hit bottom right corner
 				 ball_direction <= 2'b11;
+		   else if (paddle_x >= 2'b11 && ball_x == paddle_x - 2'b11 && ball_y == SCREEN_HEIGHT - 7'b110 && ball_direction == 2'b01) //if ball hits paddle's left corner
+				 ball_direction <= 2'b11;
+			else if (ball_x == paddle_x + 5'd17 && ball_y == SCREEN_HEIGHT - 4'b110 && ball_direction == 2'b10) //if ball hits paddle's right corner
+				 ball_direction <= 2'b00;
 			else if (ball_x <= 8'b1)begin
 				if (ball_direction == 2'b11)
 					ball_direction <= 2'b00;
 				else if (ball_direction == 2'b10)
 					ball_direction <= 2'b01;
 				end
-			else if (ball_y <= 8'b1)begin
+			else if (ball_y <= 8'b10)begin
 				if (ball_direction == 2'b00)
 					ball_direction <= 2'b01;
 				else if (ball_direction == 2'b11)
@@ -656,7 +701,7 @@ module datapath(
 			// Logic for moving the ball based on left_key and right_key
 			if (left_key == 1'b1 && paddle_x > 8'd1)
 				paddle_x <= paddle_x - 1'b1;
-			else if (right_key == 1'b1 && paddle_x < SCREEN_WIDTH - PADDLE_WIDTH - 2)
+			else if (right_key == 1'b1 && paddle_x < SCREEN_WIDTH - PADDLE_WIDTH - 1'b1)
 				paddle_x <= paddle_x + 1'b1;
         end
     end
@@ -668,25 +713,25 @@ module datapath(
             ball_touching_paddle <= 1'b0;
         end
 		else if (check_ball_touching) begin
-			if (ball_y == SCREEN_HEIGHT - 3'b111 && ball_direction == 2'b01) begin
-				if (paddle_x <= 8'b1)begin
-					if (paddle_x <= ball_x && ball_x <= paddle_x + PADDLE_WIDTH - 2'b10)
-					ball_touching_paddle <= 1'b1;
-					ball_touching_wall <= 1'b1;
-			        end
-				else if (paddle_x - 3'b100 <= ball_x && ball_x <= paddle_x + PADDLE_WIDTH - 2'b10)begin
+			if (ball_y >= SCREEN_HEIGHT - 3'b111 && ball_direction == 2'b01) begin
+				if (paddle_x <= 8'b10) begin
+					if (paddle_x - ball_x <= 2'b10 && ball_x <= paddle_x + PADDLE_WIDTH - 2'b10)
+						ball_touching_paddle <= 1'b1;
+						ball_touching_wall <= 1'b1;
+			      end
+				else if (paddle_x - 2'b11 <= ball_x && ball_x <= paddle_x + PADDLE_WIDTH - 2'b10) begin
 					ball_touching_paddle <= 1'b1;
 					ball_touching_wall <= 1'b1;
 				end
 			end
-			else if (ball_y == SCREEN_HEIGHT - 3'b111 && ball_direction == 2'b10) begin 
+			else if (ball_y >= SCREEN_HEIGHT - 3'b111 && ball_direction == 2'b10) begin 
 				if (paddle_x <= 8'b1)begin
-					if (paddle_x <= ball_x && ball_x <= paddle_x + PADDLE_WIDTH)begin
+					if (paddle_x <= ball_x && ball_x <= paddle_x + PADDLE_WIDTH) begin
 						ball_touching_paddle <= 1'b1;
 						ball_touching_wall <= 1'b1;
 						end
 					end
-				else if (paddle_x - 2'b10 <= ball_x && ball_x <= paddle_x + PADDLE_WIDTH)begin
+				else if (paddle_x - 2'b10 <= ball_x && ball_x <= paddle_x + PADDLE_WIDTH - 1'b1) begin
 					ball_touching_paddle <= 1'b1;
 					ball_touching_wall <= 1'b1;
 				end
@@ -696,7 +741,7 @@ module datapath(
 				ball_touching_wall <= 1'b1;
 				ball_touching_paddle <= 1'b0;
 			end 
-			else if (ball_y <= 7'b1) begin
+			else if (ball_y <= 7'b10) begin
 				ball_touching_wall <= 1'b1;
 				ball_touching_paddle <= 1'b0;
 			end 
@@ -728,9 +773,13 @@ module binary_to_decimal(binary_digits, decimal_digits);
     output [11:0] decimal_digits;
 	
 	wire [3:0] hundreds_digit;
+	wire [3:0] tens_digit;
+	wire [3:0] unit_digit;
    
     assign hundreds_digit = binary_digits / 100;
-    assign decimal_digits = {hundreds_digit, ((binary_digits - hundreds_digit * 100) / 10), binary_digits % 10};
+    assign tens_digit = (binary_digits/ 10) % 10;
+    assign unit_digit = binary_digits % 10;
+    assign decimal_digits = {hundreds_digit, tens_digit, unit_digit};
 endmodule
 
 module hex_decoder(hex_digit, segments);
